@@ -3,70 +3,70 @@ from datetime import datetime, timedelta, timezone
 from logger_config import logger
 from GaitKeeper import GaitKeeper
 import traceback
+import time
 
 class RatedHandler:
     def __init__(self, sk):
         self.sk = sk
         self.node_operator_ids = [37, 135]
         self.rated_ids = ["Lido", "Lido Community Staking Module"]
-        #self.no_index = [2, 5, 10, 37, 39, 66, 80, 91, 102, 103]
         for n in range(0, 235):
-            self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")
+            self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")   
 
     def check_effectiveness(self, rated_data):
-        try:
-            for id in self.rated_ids:
-                if id == "Lido": entity_type = "pool"
-                else: entity_type = "poolShare"
-                urls = {
-                    "attest": f"https://api.rated.network/v1/eth/entities/{id}/attestations",
-                    "effective": f"https://api.rated.network/v1/eth/entities/{id}/effectiveness",
+        for id in self.rated_ids:
+            if id == "Lido": entity_type = "pool"
+            else: entity_type = "poolShare"
+            urls = {
+                "attest": f"https://api.rated.network/v1/eth/entities/{id}/attestations",
+                "effective": f"https://api.rated.network/v1/eth/entities/{id}/effectiveness",
+            }
+            yest, today = self.get_last_days(days=5)
+            params = {
+                "fromDate": yest,
+                "entityType": entity_type,
+                "toDate": today,
+                "utc": "false",  # "false" for ETH chain days
+            }
+            
+            results = []
+            for key, base_url in urls.items():
+                # Headers
+                headers = {
+                    "Authorization": f"Bearer {self.sk}",  
+                    "Content-Type": "application/json",
                 }
-                yest, today = self.get_last_days(days=5)
-                params = {
-                    "fromDate": yest,
-                    "entityType": entity_type,
-                    "toDate": today,
-                    "utc": "false",  # "false" for ETH chain days
-                }
-                
-                results = []
-                for key, base_url in urls.items():
-                    # Headers
-                    headers = {
-                        "Authorization": f"Bearer {self.sk}",  # Use the appropriate header key for your API
-                        "Content-Type": "application/json",
-                    }
 
-                    # Make the GET request
+                # Make the GET request
+                try:
                     response = requests.get(base_url, headers=headers, params=params)
+                
 
                     # Handle the response
                     if response.status_code == 200:
                         data = response.json()
                         #msg = self.format_json(data)
                         logger.info("Response Data:", data)
-                        print(f"\n\n{key}\n\n")
-                        print(data)
-                        #return self.format_json(msg)
+                        #print(f"\n\n{key}\n\n")
+                        #print(data)
                         results.append(data)
                     else:
                         logger.error(f"Request failed with status code {response.status_code}: {response.text}")
                         print(f"Request failed with status code {response.status_code}: {response.text}")
-                        
-                #print(results)
-                combined_data = self.combine_jsons(results)
-                if id not in rated_data:
-                    rated_data[id] = combined_data
-                else:
-                    for timestamp, values in combined_data.items():
-                        rated_data[id][timestamp] = values
-            print(rated_data) 
-            return rated_data   
-        except Exception as e:
-                traceback.print_exc()
-                logger.error(f"An error occurred in Rated.network API check: {e}")
-                return None
+                except Exception as e:
+                    traceback.print_exc()
+                    logger.error(f"An error occurred in Rated.network API check: {e}")
+                    time.sleep(1)
+
+            #print(results)
+            combined_data = self.combine_jsons(results)
+            if id not in rated_data:
+                rated_data[id] = combined_data
+            else:
+                for timestamp, values in combined_data.items():
+                    rated_data[id][timestamp] = values
+        print(rated_data) 
+        return rated_data   
 
     def get_last_days(self, days=1):
         now = datetime.now(timezone.utc)
