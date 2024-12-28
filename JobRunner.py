@@ -29,10 +29,19 @@ class JobRunner:
 
                 files = self.s3ReadWriter.get_dir_files("lido_csm/operator_data/")
                 self.DataHandler.load_data(files=files, s3=self.s3ReadWriter)
-                temp = self.DataHandler.agg_data
-                for k, v in temp.items():
-                    print(k)
-                    print(v)
+                nos = self.DataHandler.node_data
+                for k, v in nos.items():
+                    for id, val in v.items():
+                        print(id)
+                        print(val)
+                
+                self.DataHandler.calculate_statistics()
+                temp = self.DataHandler.node_stats
+                for k, date in temp.items():
+                    for metric, val in date.items():
+                        print(metric, val)
+                        print(nos[k]["CSM Operator 37 - Lido Community Staking Module"][metric])
+
                 last_write = int(time.time())
                 self.s3ReadWriter.write_data("lido_csm/last_write", last_write)
                 logger.info(f"round {self.counter}")
@@ -44,9 +53,6 @@ class JobRunner:
                 logger.error(f"An error occurred in build_from_creation: {e}")
 
             time.sleep(self.freq_call) #sleep 2 hr
-                        
-    def format_key(self, key):
-        return key[0:8] + "..." + key[-6:]
 
     def check_s3(self, key, value, tag):
         result = self.s3ReadWriter.get_data(key, tag)
