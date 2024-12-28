@@ -44,6 +44,8 @@ class JobRunner:
                         print(nos[k]["CSM Operator 37 - Lido Community Staking Module"][metric])
 
                 plot_scatter(data=nos, variable="avgValidatorEffectiveness", operator_ids=[37, 135], date="2024-12-27", title="Title")
+                plot_scatter(data=nos, variable="avgInclusionDelay", operator_ids=[37, 135], date="2024-12-27", title="Title")
+                plot_scatter(data=nos, variable="avgProposerEffectiveness", operator_ids=[37, 135], date="2024-12-27", title="Title")
                 #plot_line(nos, "avgValidatorEffectiveness", [37, 135])
                 last_write = int(time.time())
                 self.s3ReadWriter.write_data("lido_csm/last_write", last_write)

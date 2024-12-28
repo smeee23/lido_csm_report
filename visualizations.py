@@ -39,7 +39,7 @@ def plot_scatter(data, variable, operator_ids, date=None, title="Operator Variab
     plt.tight_layout()
 
     # Save or show plot
-    output_file = "scatter_test.png"#f"scatter_plot_{variable}_{date}.png" if date else "scatter_plot.png"
+    output_file = f"visuals/scatter_plot_{variable}_{date}.png" if date else "visuals/scatter_plot.png"
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     print(f"Plot saved to {output_file}")
 
@@ -75,4 +75,4 @@ def plot_line(data, variable, operator_ids, title="Default Line Plot Title"):
     plt.legend(title="Operators")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("scatter_line_test", dpi=300, bbox_inches="tight")
+    plt.savefig("visuals/scatter_line_test", dpi=300, bbox_inches="tight")
