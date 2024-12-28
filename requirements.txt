@@ -3,3 +3,5 @@ python-dotenv==1.0.0
 boto3==1.28.31
 discord-webhook==0.13.0
 numpy==2.2.1
+matplotlib==3.10.0
+seaborn==0.13.2
