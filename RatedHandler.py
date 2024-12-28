@@ -9,11 +9,11 @@ class RatedHandler:
     def __init__(self, sk):
         self.sk = sk
         self.node_operator_ids = [37, 135]
-        self.rated_ids = ["Lido", "Lido Community Staking Module"]
-        for n in range(0, 235):
+        self.rated_ids = []#["Lido", "Lido Community Staking Module"]
+        for n in range(165, 235):
             self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")   
 
-    def check_effectiveness(self, rated_data):
+    def write_api_data(self, s3):
         for id in self.rated_ids:
             if id == "Lido": entity_type = "pool"
             else: entity_type = "poolShare"
@@ -53,20 +53,14 @@ class RatedHandler:
                     else:
                         logger.error(f"Request failed with status code {response.status_code}: {response.text}")
                         print(f"Request failed with status code {response.status_code}: {response.text}")
+
                 except Exception as e:
                     traceback.print_exc()
                     logger.error(f"An error occurred in Rated.network API check: {e}")
                     time.sleep(1)
 
-            #print(results)
             combined_data = self.combine_jsons(results)
-            if id not in rated_data:
-                rated_data[id] = combined_data
-            else:
-                for timestamp, values in combined_data.items():
-                    rated_data[id][timestamp] = values
-        print(rated_data) 
-        return rated_data   
+            s3.write_data(f"lido_csm/operator_data/{id}", combined_data) 
 
     def get_last_days(self, days=1):
         now = datetime.now(timezone.utc)

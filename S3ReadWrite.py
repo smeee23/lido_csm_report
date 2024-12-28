@@ -48,6 +48,19 @@ class S3ReadWrite:
         except Exception as e:
             logger.error(f"An error occurred: {e}")
     
+    def get_dir_files(self, path):
+        try:
+            response = self.s3.list_objects_v2(Bucket=self.bucket_name, Prefix=path)
+
+            keys = []
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    file_key = obj['Key']
+                    keys.append(file_key)
+            return keys
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
+
     def write_logs(self):
         try:
             self.s3.upload_file(
