@@ -2,8 +2,9 @@ import traceback
 from RatedHandler import RatedHandler
 from S3ReadWrite import S3ReadWrite
 from GaitKeeper import GaitKeeper
+from VisualHandler import VisualHandler
 from DataHandler import DataHandler
-from visualizations import plot_scatter, plot_line
+from visualizations import plot_line, plot_histogram
 import time
 import base64
 import json
@@ -19,6 +20,7 @@ class JobRunner:
         sk = decrypt_string(os.getenv("AWS_S3_SECRET_KEY"), os.getenv("KEY"))
         self.s3ReadWriter = S3ReadWrite(sk, os.getenv("AWS_S3_ACCESS_KEY"))
         self.DataHandler =  DataHandler()
+        self.VisualHandler = VisualHandler([37, 135, 99])
 
     def run(self):
         while(True):
@@ -28,25 +30,17 @@ class JobRunner:
                     rated_handler = RatedHandler(os.getenv("RATED_API_SK"))
                     rated_handler.write_api_data(s3=self.s3ReadWriter)
 
-                files = self.s3ReadWriter.get_dir_files("lido_csm/operator_data/")
-                self.DataHandler.load_data(files=files, s3=self.s3ReadWriter)
-                nos = self.DataHandler.node_data
-                for k, v in nos.items():
-                    for id, val in v.items():
-                        print(id)
-                        print(val)
-                
-                self.DataHandler.calculate_statistics()
-                temp = self.DataHandler.node_stats
-                for k, date in temp.items():
-                    for metric, val in date.items():
-                        print(metric, val)
-                        print(nos[k]["CSM Operator 37 - Lido Community Staking Module"][metric])
+                self.DataHandler.load_data(s3=self.s3ReadWriter)
 
-                plot_scatter(data=nos, variable="avgValidatorEffectiveness", operator_ids=[37, 135], date="2024-12-27", title="Title")
-                plot_scatter(data=nos, variable="avgInclusionDelay", operator_ids=[37, 135], date="2024-12-27", title="Title")
-                plot_scatter(data=nos, variable="avgProposerEffectiveness", operator_ids=[37, 135], date="2024-12-27", title="Title")
-                #plot_line(nos, "avgValidatorEffectiveness", [37, 135])
+                nos = self.DataHandler.node_data
+                agg_data = self.DataHandler.agg_data
+
+                self.DataHandler.calculate_statistics()
+                stats = self.DataHandler.node_stats
+
+                self.VisualHandler.generate_histograms(data=nos)
+                self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
+                
                 last_write = int(time.time())
                 self.s3ReadWriter.write_data("lido_csm/last_write", last_write)
                 logger.info(f"round {self.counter}")

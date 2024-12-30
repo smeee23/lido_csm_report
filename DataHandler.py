@@ -12,7 +12,8 @@ class DataHandler:
         self.node_data = {}
         self.node_stats = {}  
 
-    def load_data(self, files, s3):
+    def load_data(self, s3):
+        files = s3.get_dir_files("lido_csm/operator_data/")
         for key in files:
             try:
                 op_data = self.normalize_data(s3.get_data(key))
@@ -40,7 +41,8 @@ class DataHandler:
                
                 normalized_entry[k] = v
                 if any(keyword in k for keyword in ["sum", "total"]):
-                    title = re.sub(r'\b(sum|total)\b', 'avg', k)
+                    title = k.replace("sum", "perVal")
+                    title = title.replace("total", "perVal")
                     if v is None:
                         normalized_entry[title] = None
                     elif v == 0:
