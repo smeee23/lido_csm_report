@@ -45,14 +45,10 @@ class RatedHandler:
                     # Handle the response
                     if response.status_code == 200:
                         data = response.json()
-                        #msg = self.format_json(data)
                         logger.info("Response Data:", data)
-                        #print(f"\n\n{key}\n\n")
-                        #print(data)
                         results.append(data)
                     else:
                         logger.error(f"Request failed with status code {response.status_code}: {response.text}")
-                        print(f"Request failed with status code {response.status_code}: {response.text}")
 
                 except Exception as e:
                     traceback.print_exc()

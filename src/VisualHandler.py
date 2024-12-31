@@ -14,7 +14,6 @@ class VisualHandler:
             plot_histogram(data=data, variable="perValMissedAttestations", operator_ids=[id], date=date)
             plot_histogram(data=data, variable="perValWrongHeadVotes", operator_ids=[id], date=date)
             plot_histogram(data=data, variable="perValWrongTargetVotes", operator_ids=[id], date=date)
-            plot_histogram(data=data, variable="perValLateTargetVotes", operator_ids=[id], date=date)
             plot_histogram(data=data, variable="perValLateSourceVotes", operator_ids=[id], date=date)
             plot_histogram(data=data, variable="perValInclusionDelay", operator_ids=[id], date=date)
             plot_histogram(data=data, variable="avgProposerEffectiveness", operator_ids=[id], date=date)
@@ -28,7 +27,6 @@ class VisualHandler:
             plot_line(data=data, variable="perValMissedAttestations", operator_ids=[id], agg_data=agg_data)
             plot_line(data=data, variable="perValWrongHeadVotes", operator_ids=[id], agg_data=agg_data)
             plot_line(data=data, variable="perValWrongTargetVotes", operator_ids=[id], agg_data=agg_data)
-            plot_line(data=data, variable="perValLateTargetVotes", operator_ids=[id], agg_data=agg_data)
             plot_line(data=data, variable="perValInclusionDelay", operator_ids=[id], agg_data=agg_data)
             plot_line(data=data, variable="avgProposerEffectiveness", operator_ids=[id], agg_data=agg_data)
              

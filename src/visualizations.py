@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import re
 import os
+from src.logger_config import logger
 
 node_colors = ["red", "yellow", "orange", "purple", "green"]
 
@@ -24,7 +25,7 @@ def plot_histogram(data, variable, operator_ids, date=None):
     
 
     if len(highlighted_ratings) != len(operator_ids):
-        print(f"Plot not drawn b/c {variable} not found for all operator_ids {operator_ids}")
+        logger.error(f"Plot not drawn b/c {variable} not found for all operator_ids {operator_ids}")
         return
     
     # Create the histogram
@@ -37,7 +38,6 @@ def plot_histogram(data, variable, operator_ids, date=None):
     for i in range(0, len(operator_ids)):
         color_index = i % len(node_colors)
         id = operator_ids[i]
-        print("id", id)
         plt.scatter(highlighted_ratings[i], [1] , color=node_colors[color_index], label=f"CSM Operator {id}  |  {highlighted_ratings[i]:.6g}")
 
     # Add labels and title
@@ -52,7 +52,7 @@ def plot_histogram(data, variable, operator_ids, date=None):
     # Save or show plot
     output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_plot="histogram", module="CSM")
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
-    print(f"Plot saved to {output_file}")
+    logger.info(f"Plot saved to {output_file}")
 
 def plot_line(data, variable, operator_ids, agg_data=None):
     for date in data:
@@ -94,7 +94,7 @@ def plot_line(data, variable, operator_ids, agg_data=None):
     
     output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_plot="time_series", module="CSM")
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
-    print(f"Plot saved to {output_file}")
+    logger.info(f"Plot saved to {output_file}")
 
 def get_average_ratings_for_dates(data, variable, operator_ids, date=None):
     highlighted_ratings = []
@@ -124,11 +124,6 @@ def get_average_ratings_for_dates(data, variable, operator_ids, date=None):
             highlighted_ratings.append(avg)
         else:
             other_ratings.append(avg)
-
-    print(operator_counts)
-    print(operator_sums)
-    print(highlighted_ratings)
-    print(other_ratings)
     return highlighted_ratings, other_ratings, dates
 
 def format_title(metric, date, graph_type="Distribution"):
@@ -173,8 +168,7 @@ def create_output_file(id, variable, date="", type_plot="histogram", module="CSM
         date = f"{date[0]}_{date[len(date)-1]}"
 
     # Define the output file path using os.path.join
-    output_file = os.path.join("visualizations", module, str(id), f"{type_plot}_{variable}_{date}.png")
-    print(output_file)
+    output_file = os.path.join("graphs", module, str(id), type_plot, f"{variable}_{date}.png")
     # Create the directory if it doesn't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     return output_file
