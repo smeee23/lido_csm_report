@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 from discord_webhook import DiscordWebhook
 import os
-from logger_config import logger
+from src.logger_config import logger
 
 class DiscordBot:
     @staticmethod

@@ -1,8 +1,8 @@
-from JobRunner import JobRunner
+from src.JobRunner import JobRunner
 import argparse
 from dotenv import load_dotenv
 import os
-from logger_config import logger
+from src.logger_config import logger
 
 load_dotenv()  # take environment variables from .env.
 

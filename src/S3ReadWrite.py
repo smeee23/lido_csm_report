@@ -1,6 +1,6 @@
 import boto3
 import json
-from logger_config import logger
+from src.logger_config import logger
 
 class S3ReadWrite:
     def __init__(self, aws_secret_access_key, aws_access_key_id):

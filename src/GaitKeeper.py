@@ -1,6 +1,6 @@
-from DiscordBot import DiscordBot
+from src.DiscordBot import DiscordBot
 from datetime import datetime
-from logger_config import logger
+from src.logger_config import logger
 
 class GaitKeeper:
     def __init__(self):

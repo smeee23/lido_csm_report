@@ -1,16 +1,16 @@
 import traceback
-from RatedHandler import RatedHandler
-from S3ReadWrite import S3ReadWrite
-from GaitKeeper import GaitKeeper
-from VisualHandler import VisualHandler
-from DataHandler import DataHandler
-from visualizations import plot_line, plot_histogram
+from src.RatedHandler import RatedHandler
+from src.S3ReadWrite import S3ReadWrite
+from src.GaitKeeper import GaitKeeper
+from src.VisualHandler import VisualHandler
+from src.DataHandler import DataHandler
+from src.visualizations import plot_line, plot_histogram
 import time
 import base64
 import json
 import os
 import time
-from logger_config import logger
+from src.logger_config import logger
 
 class JobRunner:
     def __init__(self, freq_call, rated_api_call):
