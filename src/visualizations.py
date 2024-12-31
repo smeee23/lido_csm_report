@@ -3,7 +3,7 @@ import seaborn as sns
 import re
 import os
 
-node_colors = ["red", "green", "yellow", "orange", "purple"]
+node_colors = ["red", "yellow", "orange", "purple", "green"]
 
 def plot_histogram(data, variable, operator_ids, date=None):
     highlighted_ratings = []
