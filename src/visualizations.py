@@ -55,9 +55,10 @@ def plot_histogram(data, variable, operator_ids, date=None):
     logger.info(f"Plot saved to {output_file}")
 
 def plot_line(data, variable, operator_ids, agg_data=None):
-    for date in data:
-        if date in agg_data:
-            data[date].update(agg_data[date])
+    if agg_data:
+        for date in data:
+            if date in agg_data:
+                data[date].update(agg_data[date])
 
     operator_names = {}
     
