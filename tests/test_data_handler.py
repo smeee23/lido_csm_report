@@ -62,7 +62,7 @@ class TestDataHandler(unittest.TestCase):
             }
         }
         
-        self.handler.calculate_statistics()
+        self.handler.get_statistics()
         
         stats = self.handler.node_stats["2024-12-24"]
         self.assertIn("avgInclusionDelay", stats)
@@ -88,8 +88,87 @@ class TestDataHandler(unittest.TestCase):
 
     def test_calculate_statistics_empty_data(self):
         self.handler.node_data = {}
-        self.handler.calculate_statistics()
+        self.handler.get_statistics()
         self.assertEqual(self.handler.node_stats, {})
+
+    def test_get_zscores_normal_case(self):
+        self.handler.node_data = {
+            "2024-12-24": {
+                "operator1": {
+                    "avgInclusionDelay": 1.05,
+                    "validatorCount": 6
+                },
+                "operator2": {
+                    "avgInclusionDelay": 1.02,
+                    "validatorCount": 8
+                }
+            }
+        }
+        self.handler.node_stats = {
+            "2024-12-24": {
+                "avgInclusionDelay": {"mean": 1.035, "std_dev": 0.015},
+                "validatorCount": {"mean": 7, "std_dev": 1.0}
+            }
+        }
+        
+        self.handler.get_zscores()
+        
+        self.assertAlmostEqual(
+            self.handler.node_data["2024-12-24"]["operator1"]["avgInclusionDelay_zscore"],
+            (1.05 - 1.035) / 0.015,
+            places=3
+        )
+        self.assertAlmostEqual(
+            self.handler.node_data["2024-12-24"]["operator2"]["validatorCount_zscore"],
+            (8 - 7) / 1.0,
+            places=1
+        )
+
+    def test_get_zscores_std_dev_zero(self):
+        self.handler.node_data = {
+            "2024-12-24": {
+                "operator1": {"metric1": 5},
+                "operator2": {"metric1": 5}
+            }
+        }
+        self.handler.node_stats = {
+            "2024-12-24": {"metric1": {"mean": 5, "std_dev": 0.0}}
+        }
+        
+        self.handler.get_zscores()
+        
+        self.assertEqual(
+            self.handler.node_data["2024-12-24"]["operator1"]["metric1_zscore"],
+            0.0
+        )
+
+    def test_get_zscores_missing_statistics(self):
+        self.handler.node_data = {
+            "2024-12-24": {
+                "operator1": {"metric1": 5}
+            }
+        }
+        self.handler.node_stats = {
+            "2024-12-24": {"metric1": {"mean": None, "std_dev": None}}
+        }
+        
+        self.handler.get_zscores()
+        
+        self.assertNotIn("metric1_zscore", self.handler.node_data["2024-12-24"]["operator1"])
+
+    def test_get_zscores_handles_none_values(self):
+        self.handler.node_data = {
+            "2024-12-24": {
+                "operator1": {"metric1": None}
+            }
+        }
+        self.handler.node_stats = {
+            "2024-12-24": {"metric1": {"mean": 10, "std_dev": 2}}
+        }
+        
+        self.handler.get_zscores()
+        
+        self.assertNotIn("metric1_zscore", self.handler.node_data["2024-12-24"]["operator1"])
 
 if __name__ == '__main__':
     unittest.main()

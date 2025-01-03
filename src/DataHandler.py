@@ -36,8 +36,8 @@ class DataHandler:
         normalized_data = {}
         for date, values in data.items():
             normalized_entry = {}
-            num_vals = values["validatorCount"]
-            total_attest = values["totalUniqueAttestations"]
+            num_vals = values.get("validatorCount", 0)
+            total_attest = values.get("totalUniqueAttestations", 0)
             for k, v in values.items():
                
                 normalized_entry[k] = v
