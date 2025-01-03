@@ -39,8 +39,8 @@ class JobRunner:
 
             self.DataHandler.get_zscores()
 
-            #self.VisualHandler.generate_histograms(data=nos)
-            #self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
+            self.VisualHandler.generate_histograms(data=nos)
+            self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
             
             last_write = int(time.time())
             self.s3ReadWriter.write_data("lido_csm/last_write", last_write)

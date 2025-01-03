@@ -81,8 +81,8 @@ class DataHandler:
                 valid_values = [v for v in values if v is not None]
                 try:
                     if valid_values:
-                        median = statistics.median(valid_values)
-                        mean = statistics.mean(valid_values)
+                        median = np.median(valid_values)
+                        mean = np.mean(valid_values)
                         mode = statistics.mode(valid_values) if len(set(valid_values)) > 1 else None
                         std_dev = np.std(valid_values)
                     else:
@@ -95,7 +95,7 @@ class DataHandler:
                         'mode': mode,
                         'std_dev': std_dev,
                     }
-                except statistics.StatisticsError:
+                except Exception as e:
                     # In case of any errors with statistics calculation (e.g., no valid values)
                     self.node_stats[date][metric] = {
                         'median': None,
@@ -105,16 +105,21 @@ class DataHandler:
                     }
 
     def get_zscores(self):
-        for date, operators in list(self.node_data.items()):  # Create a list copy of items to iterate
-            for operator, metrics in list(operators.items()):  # Create a list copy of operator items
-                for metric, value in list(metrics.items()):  # Create a list copy of metric items
+        #copy items as list d/t iteration error
+        for date, operators in list(self.node_data.items()):  
+            for operator, metrics in list(operators.items()):  
+                for metric, value in list(metrics.items()): 
                     if date in self.node_stats and value is not None:
                         if metric in self.node_stats[date]:
                             try:
                                 std_dev = self.node_stats[date][metric]["std_dev"]
                                 mean = self.node_stats[date][metric]["mean"]
-                                if std_dev != 0.0:
-                                    zscore = (value - mean) / std_dev
+                                if std_dev is not None and mean is not None:
+                                    if std_dev == 0.0:
+                                        # All values are identical; z-score is 0
+                                        zscore = 0.0
+                                    else:
+                                        zscore = (value - mean) / std_dev
                                     label = f"{metric}_zscore"
                                     self.node_data[date][operator][label] = zscore
                             except Exception as e:
