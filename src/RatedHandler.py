@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime, timedelta, timezone
-from src.logger_config import logger
-from src.GaitKeeper import GaitKeeper
+from logger_config import logger
+from GaitKeeper import GaitKeeper
 import traceback
 import time
 

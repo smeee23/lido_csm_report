@@ -1,5 +1,5 @@
-from src.logger_config import logger
-from src.GaitKeeper import GaitKeeper
+from logger_config import logger
+from GaitKeeper import GaitKeeper
 import traceback
 import time
 import statistics
@@ -37,23 +37,26 @@ class DataHandler:
         for date, values in data.items():
             normalized_entry = {}
             num_vals = values["validatorCount"]
+            total_attest = values["totalUniqueAttestations"]
             for k, v in values.items():
                
                 normalized_entry[k] = v
-                if any(keyword in k for keyword in ["sum", "total"]):
-                    title = k.replace("sum", "perVal")
-                    title = title.replace("total", "perVal")
+                if "sum" in k:
+                    per_val = k.replace("sum", "perVal")
+                    pct = k.replace("sum", "pct")
+                    
                     if v is None:
-                        normalized_entry[title] = None
+                        normalized_entry[per_val] = None
                     elif v == 0:
-                        normalized_entry[title] = 0.0
+                        normalized_entry[per_val] = 0.0
                         normalized_entry[k] = 0.0
                     else:
-                        normalized_entry[title] = v / num_vals
+                        normalized_entry[per_val] = v / num_vals
+                        normalized_entry[pct] = self.calc_percent(stat=v, total_attest=total_attest)
             normalized_data[date] = normalized_entry
         return normalized_data
 
-    def calculate_statistics(self):
+    def get_statistics(self):
         #stats_per_date = {}
         
         for date, operators in self.node_data.items():
@@ -100,3 +103,29 @@ class DataHandler:
                         'mode': None,
                         'std_dev': None,
                     }
+
+    def get_zscores(self):
+        for date, operators in list(self.node_data.items()):  # Create a list copy of items to iterate
+            for operator, metrics in list(operators.items()):  # Create a list copy of operator items
+                for metric, value in list(metrics.items()):  # Create a list copy of metric items
+                    if date in self.node_stats and value is not None:
+                        if metric in self.node_stats[date]:
+                            try:
+                                std_dev = self.node_stats[date][metric]["std_dev"]
+                                mean = self.node_stats[date][metric]["mean"]
+                                if std_dev != 0.0:
+                                    zscore = (value - mean) / std_dev
+                                    label = f"{metric}_zscore"
+                                    self.node_data[date][operator][label] = zscore
+                            except Exception as e:
+                                traceback.print_exc()
+                                logger.error(f"An error occurred in zscore for {operator} {metric}: {e}")
+
+
+    def calc_percent(self, stat, total_attest):
+        if total_attest == 0:
+            return float('nan')
+        return (stat / total_attest) * 100 
+
+    def calc_zscore(self, value, mean, std_dev):
+        return (value - mean) / std_dev

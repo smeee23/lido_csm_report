@@ -1,16 +1,16 @@
 import traceback
-from src.RatedHandler import RatedHandler
-from src.S3ReadWrite import S3ReadWrite
-from src.GaitKeeper import GaitKeeper
-from src.VisualHandler import VisualHandler
-from src.DataHandler import DataHandler
-from src.visualizations import plot_line, plot_histogram
+from RatedHandler import RatedHandler
+from S3ReadWrite import S3ReadWrite
+from GaitKeeper import GaitKeeper
+from VisualHandler import VisualHandler
+from DataHandler import DataHandler
+from visualizations import plot_line, plot_histogram
 import time
 import base64
 import json
 import os
 import time
-from src.logger_config import logger
+from logger_config import logger
 
 class JobRunner:
     def __init__(self, operator_ids, rated_api_call):
@@ -34,11 +34,13 @@ class JobRunner:
             nos = self.DataHandler.node_data
             agg_data = self.DataHandler.agg_data
 
-            self.DataHandler.calculate_statistics()
+            self.DataHandler.get_statistics()
             stats = self.DataHandler.node_stats
 
-            self.VisualHandler.generate_histograms(data=nos)
-            self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
+            self.DataHandler.get_zscores()
+
+            #self.VisualHandler.generate_histograms(data=nos)
+            #self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
             
             last_write = int(time.time())
             self.s3ReadWriter.write_data("lido_csm/last_write", last_write)

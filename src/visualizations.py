@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import re
 import os
-from src.logger_config import logger
+from logger_config import logger
 
 node_colors = ["red", "yellow", "orange", "purple", "green"]
 

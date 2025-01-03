@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock, call
 import matplotlib.pyplot as plt
 import seaborn as sns
-from src.visualizations import (
+from visualizations import (
     plot_histogram, 
     plot_line,
     get_average_ratings_for_dates,
@@ -24,8 +24,8 @@ class TestPlottingFunctions(unittest.TestCase):
         self.variable = "rating"
         self.operator_ids = [1, 2]
 
-    @patch('src.visualizations.create_output_file')
-    @patch('src.visualizations.get_average_ratings_for_dates')
+    @patch('visualizations.create_output_file')
+    @patch('visualizations.get_average_ratings_for_dates')
     @patch('matplotlib.pyplot.savefig')
     @patch('matplotlib.pyplot.tight_layout')
     @patch('matplotlib.pyplot.legend')
@@ -54,7 +54,7 @@ class TestPlottingFunctions(unittest.TestCase):
         self.assertEqual(mock_scatter.call_count, 2)  # Once for each operator
         mock_savefig.assert_called_once_with("test_output.png", dpi=300, bbox_inches="tight")
 
-    @patch('src.visualizations.create_output_file')
+    @patch('visualizations.create_output_file')
     @patch('matplotlib.pyplot.savefig')
     @patch('matplotlib.pyplot.tight_layout')
     @patch('matplotlib.pyplot.grid')

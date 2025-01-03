@@ -1,5 +1,5 @@
 import unittest
-from src.utils import extract_metric, calculate_statistics, analyze_operator
+from utils import extract_metric, calculate_statistics, analyze_operator
 
 class TestUtils(unittest.TestCase):
     def setUp(self):

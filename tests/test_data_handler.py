@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 import json
-from src.DataHandler import DataHandler
+from DataHandler import DataHandler
 
 class TestDataHandler(unittest.TestCase):
     def setUp(self):

@@ -1,4 +1,4 @@
-from src.visualizations import plot_histogram, plot_line
+from visualizations import plot_histogram, plot_line
 
 class VisualHandler:
     def __init__(self, operator_ids):
