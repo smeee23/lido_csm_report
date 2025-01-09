@@ -1,10 +1,112 @@
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Image, Spacer
+from reportlab.lib.units import inch
+import io
 import matplotlib.pyplot as plt
 import seaborn as sns
 import re
 import os
 from logger_config import logger
+from utils import create_output_file, format_op_ids
 
 node_colors = ["red", "yellow", "orange", "purple", "green"]
+
+def create_metric_page(pdf_path, node_operator, metric_name, description, figure, metric_data):
+    """
+    Creates a PDF page with metric analysis for a node operator.
+    
+    Args:
+        pdf_path: Output PDF file path
+        node_operator: Name of the node operator
+        metric_name: Name of the metric being analyzed
+        description: 1-2 paragraph description of the metric
+        figure: matplotlib figure object
+        metric_data: Dict containing metric values and statistics
+    """
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
+    styles = getSampleStyleSheet()
+    
+    # Create custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30
+    )
+    
+    description_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=12,
+        leading=14,
+        spaceAfter=20
+    )
+    
+    # Convert matplotlib figure to ReportLab Image
+    img_buffer = io.BytesIO()
+    figure.savefig(img_buffer, format='png', bbox_inches='tight')
+    img_buffer.seek(0)
+    image = Image(img_buffer, width=7*inch, height=4.2*inch)
+    
+    # Create table data
+    table_data = [
+        ['Metric', 'Value', 'Z-Score'],
+        ['Raw Metric', metric_data['metric'], metric_data['metric_zscore']],
+        ['Per Validator', metric_data['per_validator'], metric_data['per_validator_zscore']],
+        ['Operator Average', metric_data['operator_avg'], metric_data['operator_avg_zscore']],
+        ['All Operators Mean', metric_data['all_operators_mean'], ''],
+        ['All Operators Median', metric_data['all_operators_median'], ''],
+        ['All Operators Mode', metric_data['all_operators_mode'], ''],
+        ['Standard Deviation', metric_data['std_dev'], '']
+    ]
+    
+    table = Table(table_data, colWidths=[2.5*inch, 2*inch, 2*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    # Build the PDF content
+    content = [
+        Paragraph(f"{node_operator} - {metric_name} Analysis", title_style),
+        Paragraph(description, description_style),
+        image,
+        Spacer(1, 20),
+        table
+    ]
+    
+    doc.build(content)
+
+# Example usage:
+def generate_metric_report(node_operator, metric_data_dict):
+    """
+    Generate PDF report pages for each metric.
+    
+    Args:
+        node_operator: Name of the node operator
+        metric_data_dict: Dictionary containing metric data and figures
+    """
+    for metric_name, data in metric_data_dict.items():
+        output_path = f"{node_operator}_{metric_name}_analysis.pdf"
+        create_metric_page(
+            output_path,
+            node_operator,
+            metric_name,
+            data['description'],
+            data['figure'],
+            data['metrics']
+        )
 
 def plot_histogram(data, variable, operator_ids, date=None):
     highlighted_ratings = []
@@ -152,27 +254,6 @@ def format_label(metric):
     formatted_string = generate_spaces(metric)
     
     return f"{formatted_string} / Num Validators" 
-
-def format_op_ids(operator_ids):
-    if len(operator_ids) == 1:
-        return str(operator_ids[0])
-    
-    s = ""
-    for id in operator_ids:
-        s = f"{s}_{id}"
-    
-    return s
-
-def create_output_file(id, variable, date="", type_plot="histogram", module="CSM"):
-
-    if isinstance(date, list) and len(date) > 1:
-        date = f"{date[0]}_{date[len(date)-1]}"
-
-    # Define the output file path using os.path.join
-    output_file = os.path.join("graphs", module, str(id), type_plot, f"{variable}_{date}.png")
-    # Create the directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    return output_file
 
 def generate_spaces(s):
     return re.sub(r'(?<!^)(?=[A-Z])', ' ', s).replace("avg", "Average")

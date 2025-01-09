@@ -4,6 +4,7 @@ from S3ReadWrite import S3ReadWrite
 from GaitKeeper import GaitKeeper
 from VisualHandler import VisualHandler
 from DataHandler import DataHandler
+from ReportHandler import ReportHandler
 from visualizations import plot_line, plot_histogram
 import time
 import base64
@@ -21,6 +22,7 @@ class JobRunner:
         self.s3ReadWriter = S3ReadWrite(sk, os.getenv("AWS_S3_ACCESS_KEY"))
         self.DataHandler =  DataHandler()
         self.VisualHandler = VisualHandler(self.operator_ids)
+        self.ReportHandler = ReportHandler()
 
     def run(self):
         try:
@@ -33,15 +35,28 @@ class JobRunner:
 
             nos = self.DataHandler.node_data
             agg_data = self.DataHandler.agg_data
+            self.DataHandler.get_mva(['2024-12-27', '2024-12-26', '2024-12-25'])
 
             self.DataHandler.get_statistics()
             stats = self.DataHandler.node_stats
 
             self.DataHandler.get_zscores()
 
-            self.VisualHandler.generate_histograms(data=nos)
-            self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
+            for date, operators in nos.items():
+                for id, metrics in operators.items():
+                    if " 99 -" in id:
+                        for key, value in metrics.items():
+                            print(date)
+                            print(key, value)
             
+            #for date, metrics in stats.items():
+            #    for metric, value in metrics.items():
+            #        print(metric, value)
+            #self.VisualHandler.generate_histograms(data=nos)
+            #self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
+            
+            #self.ReportHandler.generate_report([99])
+
             last_write = int(time.time())
             self.s3ReadWriter.write_data("lido_csm/last_write", last_write)
             logger.info(f"round {self.counter}")

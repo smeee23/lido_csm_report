@@ -5,3 +5,4 @@ discord-webhook==0.13.0
 numpy==2.2.1
 matplotlib==3.10.0
 seaborn==0.13.2
+reportlab==4.2.5
