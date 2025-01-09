@@ -24,17 +24,16 @@ class TestDataHandler(unittest.TestCase):
                 "validatorCount": 10,
                 "sumMissedAttestations": 50,
                 "sumInclusionDelay": 1000,
+                "totalUniqueAttestations": 1000
             }
         }
         
         normalized = self.handler.normalize_data(input_data)
+        self.assertEqual(normalized["2024-12-24"]["validatorCount"], {"metric": 10})
+        self.assertEqual(normalized["2024-12-24"]["sumMissedAttestations"], {'metric': 50, 'per_val': 5.0, 'attest_pct': 5.0})
+        self.assertEqual(normalized["2024-12-24"]["sumInclusionDelay"], {"metric": 1000})
+        self.assertEqual(normalized["2024-12-24"]["totalUniqueAttestations"], {"metric": 1000})
         
-        self.assertEqual(normalized["2024-12-24"]["validatorCount"], 10)
-        self.assertEqual(normalized["2024-12-24"]["sumMissedAttestations"], 50)
-        self.assertEqual(normalized["2024-12-24"]["sumInclusionDelay"], 1000)
-        self.assertEqual(normalized["2024-12-24"]["perValMissedAttestations"], 5.0)
-        self.assertEqual(normalized["2024-12-24"]["perValInclusionDelay"], 100.0)
-
     def test_normalize_data_handles_none(self):
         input_data = {
             "2024-12-24": {
@@ -44,20 +43,20 @@ class TestDataHandler(unittest.TestCase):
         }
         
         normalized = self.handler.normalize_data(input_data)
-        self.assertIsNone(normalized["2024-12-24"]["perValMissedAttestations"])
+        self.assertEqual(normalized["2024-12-24"]["sumMissedAttestations"], {'metric': None, 'per_val': None, 'attest_pct': None})
 
     def test_calculate_statistics(self):
         self.handler.node_data = {
             "2024-12-24": {
                 "operator1": {
-                    "avgInclusionDelay": 1.05,
-                    "avgValidatorEffectiveness": 94.4,
-                    "validatorCount": 6
+                    "avgInclusionDelay": {"metric": 1.05},
+                    "avgValidatorEffectiveness":  {"metric": 94.4},
+                    "validatorCount":  {"metric": 6}
                 },
                 "operator2": {
-                    "avgInclusionDelay": 1.02,
-                    "avgValidatorEffectiveness": 96.5,
-                    "validatorCount": 6
+                    "avgInclusionDelay":  {"metric": 1.02},
+                    "avgValidatorEffectiveness":  {"metric": 96.5},
+                    "validatorCount":  {"metric": 6}
                 }
             }
         }
@@ -65,12 +64,13 @@ class TestDataHandler(unittest.TestCase):
         self.handler.get_statistics()
         
         stats = self.handler.node_stats["2024-12-24"]
+
         self.assertIn("avgInclusionDelay", stats)
         self.assertIn("avgValidatorEffectiveness", stats)
         
         # Test statistical calculations
-        self.assertAlmostEqual(stats["avgInclusionDelay"]["median"], 1.035, places=3)
-        self.assertAlmostEqual(stats["avgValidatorEffectiveness"]["median"], 95.45, places=2)
+        self.assertAlmostEqual(stats["avgInclusionDelay"]["metric"]["median"], 1.035, places=3)
+        self.assertAlmostEqual(stats["avgValidatorEffectiveness"]["metric"]["median"], 95.45, places=2)
 
     def test_load_data(self):
         # Mock S3 responses
@@ -82,7 +82,7 @@ class TestDataHandler(unittest.TestCase):
         # Verify data was loaded correctly
         self.assertIn("2024-12-24", self.handler.node_data)
         self.assertEqual(
-            self.handler.node_data["2024-12-24"]["CSM Operator 1"]["validatorCount"],
+            self.handler.node_data["2024-12-24"]["CSM Operator 1"]["validatorCount"]["metric"],
             6
         )
 
@@ -95,31 +95,30 @@ class TestDataHandler(unittest.TestCase):
         self.handler.node_data = {
             "2024-12-24": {
                 "operator1": {
-                    "avgInclusionDelay": 1.05,
-                    "validatorCount": 6
+                    "avgInclusionDelay": {"metric": 1.05},
+                    "validatorCount": {"metric": 6}
                 },
                 "operator2": {
-                    "avgInclusionDelay": 1.02,
-                    "validatorCount": 8
+                    "avgInclusionDelay": {"metric": 1.02},
+                    "validatorCount": {"metric": 8}
                 }
             }
         }
         self.handler.node_stats = {
             "2024-12-24": {
-                "avgInclusionDelay": {"mean": 1.035, "std_dev": 0.015},
-                "validatorCount": {"mean": 7, "std_dev": 1.0}
+                "avgInclusionDelay": {"metric": {"mean": 1.035, "std_dev": 0.015}},
+                "validatorCount": {"metric": {"mean": 7, "std_dev": 1.0}}
             }
         }
         
         self.handler.get_zscores()
-        
         self.assertAlmostEqual(
-            self.handler.node_data["2024-12-24"]["operator1"]["avgInclusionDelay_zscore"],
+            self.handler.node_data["2024-12-24"]["operator1"]["avgInclusionDelay"]["zscore_metric"],
             (1.05 - 1.035) / 0.015,
             places=3
         )
         self.assertAlmostEqual(
-            self.handler.node_data["2024-12-24"]["operator2"]["validatorCount_zscore"],
+            self.handler.node_data["2024-12-24"]["operator2"]["validatorCount"]["zscore_metric"],
             (8 - 7) / 1.0,
             places=1
         )
@@ -127,29 +126,28 @@ class TestDataHandler(unittest.TestCase):
     def test_get_zscores_std_dev_zero(self):
         self.handler.node_data = {
             "2024-12-24": {
-                "operator1": {"metric1": 5},
-                "operator2": {"metric1": 5}
+                "operator1": {"metric1": {"metric": 5}},
+                "operator2": {"metric1": {"metric": 5}}
             }
         }
         self.handler.node_stats = {
-            "2024-12-24": {"metric1": {"mean": 5, "std_dev": 0.0}}
+            "2024-12-24": {"metric1": {"metric": {"mean": 5, "std_dev": 0.0}}}
         }
         
         self.handler.get_zscores()
-        
         self.assertEqual(
-            self.handler.node_data["2024-12-24"]["operator1"]["metric1_zscore"],
+           self.handler.node_data["2024-12-24"]["operator1"]["metric1"]["zscore_metric"],
             0.0
         )
 
     def test_get_zscores_missing_statistics(self):
         self.handler.node_data = {
             "2024-12-24": {
-                "operator1": {"metric1": 5}
+                "operator1": {"metric1": {"metric": 5}}
             }
         }
         self.handler.node_stats = {
-            "2024-12-24": {"metric1": {"mean": None, "std_dev": None}}
+            "2024-12-24": {"metric1": {"metric": {"mean": None, "std_dev": None}}}
         }
         
         self.handler.get_zscores()
@@ -159,11 +157,11 @@ class TestDataHandler(unittest.TestCase):
     def test_get_zscores_handles_none_values(self):
         self.handler.node_data = {
             "2024-12-24": {
-                "operator1": {"metric1": None}
+                "operator1": {"metric1": {"metric": None}}
             }
         }
         self.handler.node_stats = {
-            "2024-12-24": {"metric1": {"mean": 10, "std_dev": 2}}
+            "2024-12-24": {"metric1": {"metric":{"mean": 10, "std_dev": 2}}}
         }
         
         self.handler.get_zscores()

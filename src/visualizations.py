@@ -108,7 +108,7 @@ def generate_metric_report(node_operator, metric_data_dict):
             data['metrics']
         )
 
-def plot_histogram(data, variable, operator_ids, date=None):
+def plot_histogram(data, variable, operator_ids, variant="per_val", date=None):
     highlighted_ratings = []
     other_ratings = []
 
@@ -119,11 +119,11 @@ def plot_histogram(data, variable, operator_ids, date=None):
     elif date:
         if date in data:
             for operator, metrics in data[date].items():
-                if variable in metrics and metrics[variable] is not None:
+                if variable in metrics and metrics[variable][variant] is not None:
                     if any(f"Operator {id} -" in operator for id in operator_ids):
-                        highlighted_ratings.append(metrics[variable])
+                        highlighted_ratings.append(metrics[variable][variant])
                     else:
-                        other_ratings.append(metrics[variable])
+                        other_ratings.append(metrics[variable][variant])
     
 
     if len(highlighted_ratings) != len(operator_ids):
@@ -156,10 +156,11 @@ def plot_histogram(data, variable, operator_ids, date=None):
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     logger.info(f"Plot saved to {output_file}")
 
-def plot_line(data, variable, operator_ids, agg_data=None):
+def plot_line(data, variable, operator_ids, variant="per_val", agg_data=None):
     if agg_data:
         for date in data:
-            if date in agg_data:
+            # exclude compound dates e.g. 2024-12-25_2024-12-27
+            if date in agg_data and "_" not in date: 
                 data[date].update(agg_data[date])
 
     operator_names = {}
@@ -170,11 +171,11 @@ def plot_line(data, variable, operator_ids, agg_data=None):
                 any(f"Operator {node_id} -" in operator for node_id in operator_ids) or 
                 operator in ["Lido", "Lido Community Staking Module"]
             ):
-                if variable in metrics and metrics[variable] is not None:
+                if variable in metrics and metrics[variable][variant] is not None and "_" not in date:
                     if operator not in operator_names:
                         operator_names[operator] = {"dates": [], "values": []}
                     operator_names[operator]["dates"].append(date)
-                    operator_names[operator]["values"].append(metrics[variable])
+                    operator_names[operator]["values"].append(metrics[variable][variant])
     
     plt.figure(figsize=(12, 6))
     
@@ -199,26 +200,28 @@ def plot_line(data, variable, operator_ids, agg_data=None):
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     logger.info(f"Plot saved to {output_file}")
 
-def get_average_ratings_for_dates(data, variable, operator_ids, date=None):
+def get_average_ratings_for_dates(data, variable, operator_ids, variant="per_val", date=None):
     highlighted_ratings = []
     other_ratings = []
     operator_counts = {}
     operator_sums = {}
 
     # If date is None, use all available dates in the data
-    if date is None: dates = list(data.keys())
+    # exclude compound dates e.g. 2024-12-25_2024-12-27
+    valid_dates = [d for d in list(data.keys()) if "_" not in d]
+    if date is None: dates = valid_dates
     else: dates = date
 
     for current_date in dates:
-        if current_date in data:
+        if current_date in data and "_" not in current_date:
             for operator, metrics in data[current_date].items():
-                if variable in metrics and metrics[variable] is not None:
+                if variable in metrics and metrics[variable][variant] is not None:
                     if operator not in operator_counts:
                         operator_counts[operator] = 0
                         operator_sums[operator] = 0
 
                     operator_counts[operator] += 1
-                    operator_sums[operator] += metrics[variable]
+                    operator_sums[operator] += metrics[variable][variant]
 
     # Calculate averages
     for operator in operator_counts:

@@ -16,13 +16,14 @@ class TestPlottingFunctions(unittest.TestCase):
     def setUp(self):
         self.test_data = {
             "2024-12-31": {
-                "Operator 1 - Lido Community Staking Module": {"rating": 5},
-                "Operator 2 - Lido Community Staking Module": {"rating": 3},
-                "Other Operator": {"rating": 4}
+                "Operator 1 - Lido Community Staking Module": {"rating": {"metric": 5}},
+                "Operator 2 - Lido Community Staking Module": {"rating": {"metric": 3}},
+                "Other Operator": {"rating": {"metric": 4}}
             }
         }
         self.variable = "rating"
         self.operator_ids = [1, 2]
+        self.variant = "metric"
 
     @patch('visualizations.create_output_file')
     @patch('visualizations.get_average_ratings_for_dates')
@@ -73,7 +74,7 @@ class TestPlottingFunctions(unittest.TestCase):
         mock_create_output.return_value = "test_output.png"
 
         # Call function
-        plot_line(self.test_data, self.variable, self.operator_ids)
+        plot_line(self.test_data, self.variable, self.operator_ids, self.variant)
 
         # Verify calls
         mock_figure.assert_called_once_with(figsize=(12, 6))
@@ -90,7 +91,8 @@ class TestPlottingFunctions(unittest.TestCase):
         highlighted, others, dates = get_average_ratings_for_dates(
             self.test_data, 
             self.variable, 
-            self.operator_ids
+            self.operator_ids,
+            self.variant
         )
         self.assertEqual(highlighted, [5, 3])
         self.assertEqual(others, [4])

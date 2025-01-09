@@ -42,20 +42,8 @@ class JobRunner:
 
             self.DataHandler.get_zscores()
 
-            for date, operators in nos.items():
-                for id, metrics in operators.items():
-                    if " 99 -" in id:
-                        for key, value in metrics.items():
-                            print(date)
-                            print(key, value)
-            
-            #for date, metrics in stats.items():
-            #    for metric, value in metrics.items():
-            #        print(metric, value)
-            #self.VisualHandler.generate_histograms(data=nos)
-            #self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
-            
-            #self.ReportHandler.generate_report([99])
+            self.VisualHandler.generate_histograms(data=nos, date="2024-12-25_2024-12-27")
+            self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
 
             last_write = int(time.time())
             self.s3ReadWriter.write_data("lido_csm/last_write", last_write)
