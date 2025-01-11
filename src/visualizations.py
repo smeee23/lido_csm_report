@@ -39,13 +39,13 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
     if figure_buffers[0]:
         figure_buffer = figure_buffers[0]
         figure_buffer.seek(0)
-        image1 = Image(figure_buffer, width=5.25*inch, height=3.15*inch)
+        image1 = Image(figure_buffer, width=4.725*inch, height=2.835*inch)
     else: image1 = None
     
     if figure_buffers[1]:
         figure_buffer = figure_buffers[1]
         figure_buffer.seek(0)
-        image2 = Image(figure_buffer, width=5.25*inch, height=3.15*inch)
+        image2 = Image(figure_buffer, width=4.725*inch, height=2.835*inch)
     else: image2 = None
 
     if metric_name in ATTEST_METRICS:
@@ -53,16 +53,17 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
     # Create table data
     table_data = [
         ['Metric', 'Value', 'Z-Score', 'Description'],
-        ['CSM Operators Avg', metric_data['mean'], '',''],
-        ['CSM Operators Median', metric_data['median'], '', ''],
-        ['Standard Deviation', metric_data['std_dev'], '', ''],
-        ['# Validators', metric_data['validatorCount'], '', ''],
-        ['Total Attestations', metric_data['totalUniqueAttestations'], '', '']
+        ['CSM Operators Avg', metric_data['mean'], '-',''],
+        ['CSM Operators Median', metric_data['median'], '-', ''],
+        ['Standard Deviation', metric_data['std_dev'], '-', ''],
+        ['# Validators', metric_data['validatorCount'], '-', ''],
     ]
 
     if metric_name in ATTEST_METRICS:
-        table_data.insert(1, [format_label(metric_name).replace("Per Validator", ""), metric_data['per_val'], metric_data['zscore_per_val'], desc_para])
+        table_data.insert(1, [f"{format_label(metric_name).replace("Per Validator", "")} / Val / Day", metric_data['per_val'], metric_data['zscore_per_val'], desc_para])
         table_data.insert(2, ['% Total Attestations', f"{metric_data['attest_pct']}%", metric_data['zscore_attest_pct'], ''])
+        table_data.insert(-1, [f'Total {format_label(metric_name).replace("Per Validator", "")}', metric_data['sum'], '-', ''])
+        table_data.insert(-1, ['Total Attestations', metric_data['totalUniqueAttestations'], '-', ''])
     else:
         table_data.insert(1, [format_label(metric_name).replace("Average", ""), metric_data['metric'], metric_data['zscore_metric'], desc_para])
 

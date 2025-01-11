@@ -24,6 +24,8 @@ OTHER_METRICS = ["validatorCount",
                 "avgProposerEffectiveness",
                 "avgValidatorEffectiveness"]
 
+SUMS = []
+
 DESCRIPTIONS = {
     "sumWrongHeadVotes": "A wrong head vote in Ethereum consensus refers to a validator incorrectly voting for a block that is not the canonical head of the chain according to the LMD-GHOST fork-choice rule. Validators are expected to vote for the block with the highest accumulated attestations as the chain’s head. Wrong head votes can result from network delays, client issues, or outdated views of the chain. Frequent wrong head votes reduce validator rewards and can degrade network performance by delaying finality.",
     "avgValidatorEffectiveness": "A measure of the average performance of a validator across key consensus duties, such as proposing blocks and attesting correctly. A higher rating indicates that the validator consistently participates in securing the network and follows the protocol rules effectively. This metric helps assess the reliability and efficiency of a validator, with poor effectiveness typically resulting in lower rewards and a negative impact on the network’s overall health.",

@@ -31,8 +31,6 @@ class DataHandler:
             except Exception as e:
                 traceback.print_exc()
                 logger.error(f"An error occurred in load_data: {e}")
-        
-        print(find_date_groups(self.node_data))
     
     def normalize_data(self, data):
         normalized_data = {}
@@ -179,6 +177,10 @@ class DataHandler:
                         sum_attest = np.sum(valid_attest)
                         self.node_data[date_range_key][operator][metric][variable] = sum_attest
                     else:
+                        if variable == 'metric' and metric in ATTEST_METRICS:
+                            valid_values = [float(v) for v in metrics[metric][variable] if v is not None]
+                            sum_values = np.sum(valid_values)
+                            self.node_data[date_range_key][operator][metric]['sum'] = sum_values
                         if variable == 'attest_pct':
                             valid_metrics = [v for v in metrics[metric]['metric'] if v is not None]
                             sum_metric = np.sum(valid_metrics)

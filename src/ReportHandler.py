@@ -23,7 +23,7 @@ class ReportHandler:
                     if any([f" {op_id} -" in id for op_id in self.operator_ids]):
                         for key, value in metrics.items():
                             if date == "2024-12-25_2024-12-27" and key in DESCRIPTIONS.keys():
-                                #print(key, value)
+                                
                                 pdf_path = create_output_file(
                                                 id=format_op_ids(self.operator_ids), 
                                                 variable=key, 
@@ -68,6 +68,8 @@ class ReportHandler:
                                 metric_data = {**(self.dh.node_stats[date][key][stat_type]) , **(self.dh.node_data[date][id][key])}                              
                                 metric_data['validatorCount'] = self.dh.node_data[date][id]['validatorCount']['metric']
                                 metric_data['totalUniqueAttestations'] = self.dh.node_data[date][id]['totalUniqueAttestations']['metric']
+                                if "sum" in self.dh.node_data[date][id][key]:
+                                    metric_data['sum'] = self.dh.node_data[date][id][key]['sum']
                                 metric_data = {k: f"{v:.{3}f}".rstrip('0').rstrip('.') if isinstance(v, float) else v for k, v in metric_data.items()}
 
                                 create_metric_page(

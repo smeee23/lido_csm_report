@@ -41,10 +41,6 @@ class JobRunner:
             stats = self.DataHandler.node_stats
 
             self.DataHandler.get_zscores()
-            
-            #for date, metrics in stats.items():
-            #    for metric, value in metrics.items():
-            #        print(metric, value)
 
             self.VisualHandler.generate_histograms(data=nos, date="2024-12-25_2024-12-27")
             self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
