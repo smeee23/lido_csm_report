@@ -174,14 +174,26 @@ class DataHandler:
                         self.node_data[date_range_key][operator][metric][variable]  = date_list[0]
                     elif metric == "endTimestamp":
                         self.node_data[date_range_key][operator][metric][variable] = date_list[-1]
+                    elif metric == 'totalUniqueAttestations':
+                        valid_attest = [float(v) for v in metrics['totalUniqueAttestations']['metric'] if v is not None]
+                        sum_attest = np.sum(valid_attest)
+                        self.node_data[date_range_key][operator][metric][variable] = sum_attest
                     else:
-                        # Filter out None values before computing the mean
-                        valid_values = [v for v in item_list if v is not None]
-                        if valid_values:
-                            mean = np.mean(valid_values)
+                        if variable == 'attest_pct':
+                            valid_metrics = [v for v in metrics[metric]['metric'] if v is not None]
+                            sum_metric = np.sum(valid_metrics)
+                            valid_attest = [v for v in metrics['totalUniqueAttestations']['metric'] if v is not None]
+                            sum_attest = np.sum(valid_attest)
+                            if valid_metrics and valid_attest: pct = self.calc_percent(sum_metric, sum_attest)
+                            else: pct =  None
+                            self.node_data[date_range_key][operator][metric][variable] = pct
                         else:
-                            mean = None  # Set mean to None if no valid values exist
-                        self.node_data[date_range_key][operator][metric][variable] = mean
+                            valid_values = [v for v in item_list if v is not None]
+                            if valid_values:
+                                mean = np.mean(valid_values)
+                            else:
+                                mean = None  # Set mean to None if no valid values exist
+                            self.node_data[date_range_key][operator][metric][variable] = mean
 
     def calc_percent(self, stat, total_attest):
         if total_attest == 0:

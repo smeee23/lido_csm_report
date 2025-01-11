@@ -9,86 +9,102 @@ import seaborn as sns
 import re
 import os
 from logger_config import logger
-from utils import create_output_file, format_op_ids
+from utils import create_output_file, format_op_ids, ATTEST_METRICS
 
 node_colors = ["red", "yellow", "orange", "purple", "green"]
 
-def create_metric_page(pdf_path, node_operator, metric_name, description, figure, metric_data):
-    """
-    Creates a PDF page with metric analysis for a node operator.
-    
-    Args:
-        pdf_path: Output PDF file path
-        node_operator: Name of the node operator
-        metric_name: Name of the metric being analyzed
-        description: 1-2 paragraph description of the metric
-        figure: matplotlib figure object
-        metric_data: Dict containing metric values and statistics
-    """
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
+def create_metric_page(pdf_path, node_operator, metric_name, description, figure_buffers, metric_data, date):
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=32, bottomMargin=32)
     styles = getSampleStyleSheet()
     
     # Create custom styles
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
-        fontSize=24,
-        spaceAfter=30
+        fontSize=14,
+        spaceAfter=10
     )
     
     description_style = ParagraphStyle(
         'CustomBody',
         parent=styles['Normal'],
-        fontSize=12,
+        fontSize=7,
         leading=14,
-        spaceAfter=20
+        spaceAfter=10
     )
+    # Create description paragraph
+    desc_para = Paragraph(description, description_style)
+
+    # Convert buffer to ReportLab Image
+    if figure_buffers[0]:
+        figure_buffer = figure_buffers[0]
+        figure_buffer.seek(0)
+        image1 = Image(figure_buffer, width=5.25*inch, height=3.15*inch)
+    else: image1 = None
     
-    # Convert matplotlib figure to ReportLab Image
-    img_buffer = io.BytesIO()
-    figure.savefig(img_buffer, format='png', bbox_inches='tight')
-    img_buffer.seek(0)
-    image = Image(img_buffer, width=7*inch, height=4.2*inch)
-    
+    if figure_buffers[1]:
+        figure_buffer = figure_buffers[1]
+        figure_buffer.seek(0)
+        image2 = Image(figure_buffer, width=5.25*inch, height=3.15*inch)
+    else: image2 = None
+
+    if metric_name in ATTEST_METRICS:
+        tag = "per val"
     # Create table data
     table_data = [
-        ['Metric', 'Value', 'Z-Score'],
-        ['Raw Metric', metric_data['metric'], metric_data['metric_zscore']],
-        ['Per Validator', metric_data['per_validator'], metric_data['per_validator_zscore']],
-        ['Operator Average', metric_data['operator_avg'], metric_data['operator_avg_zscore']],
-        ['All Operators Mean', metric_data['all_operators_mean'], ''],
-        ['All Operators Median', metric_data['all_operators_median'], ''],
-        ['All Operators Mode', metric_data['all_operators_mode'], ''],
-        ['Standard Deviation', metric_data['std_dev'], '']
+        ['Metric', 'Value', 'Z-Score', 'Description'],
+        ['CSM Operators Avg', metric_data['mean'], '',''],
+        ['CSM Operators Median', metric_data['median'], '', ''],
+        ['Standard Deviation', metric_data['std_dev'], '', ''],
+        ['# Validators', metric_data['validatorCount'], '', ''],
+        ['Total Attestations', metric_data['totalUniqueAttestations'], '', '']
     ]
-    
-    table = Table(table_data, colWidths=[2.5*inch, 2*inch, 2*inch])
+
+    if metric_name in ATTEST_METRICS:
+        table_data.insert(1, [format_label(metric_name).replace("Per Validator", ""), metric_data['per_val'], metric_data['zscore_per_val'], desc_para])
+        table_data.insert(2, ['% Total Attestations', f"{metric_data['attest_pct']}%", metric_data['zscore_attest_pct'], ''])
+    else:
+        table_data.insert(1, [format_label(metric_name).replace("Average", ""), metric_data['metric'], metric_data['zscore_metric'], desc_para])
+
+    # Create the table with the description column
+    table = Table(table_data, colWidths=[1.5*inch, 1.25*inch, 1.25*inch, 3*inch])
     table.setStyle(TableStyle([
+        # Header row styling
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        
+        # Data rows styling
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),  # Only color first 3 columns
         ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('ALIGN', (0, 1), (2, -1), 'CENTER'),
+        
+        # Grid styling
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Grid only for first 3 columns
+        
+        # Description column styling
+        ('SPAN', (3, 1), (3, -1)),  # Merge all cells in description column
+        ('ALIGN', (3, 1), (3, -1), 'LEFT'),
+        ('VALIGN', (3, 1), (3, -1), 'TOP'),
     ]))
     
     # Build the PDF content
     content = [
-        Paragraph(f"{node_operator} - {metric_name} Analysis", title_style),
-        Paragraph(description, description_style),
-        image,
+        Paragraph(f"{node_operator[4:]} - {format_label(metric_name)} Analysis for {date.replace("_", " - ")}", title_style),
+        image1,
+        Spacer(1, 20),
+        image2,
         Spacer(1, 20),
         table
     ]
     
     doc.build(content)
 
-# Example usage:
 def generate_metric_report(node_operator, metric_data_dict):
     """
     Generate PDF report pages for each metric.
@@ -152,7 +168,7 @@ def plot_histogram(data, variable, operator_ids, variant="per_val", date=None):
     plt.tight_layout()
 
     # Save or show plot
-    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_plot="histogram", module="CSM")
+    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="histogram", module="CSM")
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     logger.info(f"Plot saved to {output_file}")
 
@@ -196,7 +212,7 @@ def plot_line(data, variable, operator_ids, variant="per_val", agg_data=None):
     plt.grid(True)
     plt.tight_layout()
     
-    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_plot="time_series", module="CSM")
+    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="time_series", module="CSM")
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     logger.info(f"Plot saved to {output_file}")
 
@@ -244,6 +260,8 @@ def format_title(metric, date, graph_type="Distribution"):
         date = ""
     elif isinstance(date, list) and len(date) > 1:
         date = f"{len(date)}day MVA {date[len(date)-1]}"
+    elif "_" in date:
+        date = date.replace("_", " - ")
     
 
     return f"{formatted_string.replace("avg", "Average")} {graph_type} {date}" 
@@ -253,10 +271,13 @@ def format_label(metric):
     if metric.startswith("perVal"):
         metric = metric[6:]
     
+    metric = metric
     # Add a space before each capital letter
     formatted_string = generate_spaces(metric)
     
-    return f"{formatted_string} / Num Validators" 
+    if "Average" in formatted_string:
+        return formatted_string
+    return f"{formatted_string} Per Validator" 
 
 def generate_spaces(s):
-    return re.sub(r'(?<!^)(?=[A-Z])', ' ', s).replace("avg", "Average")
+    return re.sub(r'(?<!^)(?=[A-Z])', ' ', s).replace("avg", "Average").replace("sum", "")

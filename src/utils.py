@@ -23,17 +23,27 @@ OTHER_METRICS = ["validatorCount",
                 "avgCorrectness",
                 "avgProposerEffectiveness",
                 "avgValidatorEffectiveness"]
- 
 
-def create_output_file(id, variable, date="", type_plot="histogram", module="CSM", file_name=None):
+DESCRIPTIONS = {
+    "sumWrongHeadVotes": "A wrong head vote in Ethereum consensus refers to a validator incorrectly voting for a block that is not the canonical head of the chain according to the LMD-GHOST fork-choice rule. Validators are expected to vote for the block with the highest accumulated attestations as the chain’s head. Wrong head votes can result from network delays, client issues, or outdated views of the chain. Frequent wrong head votes reduce validator rewards and can degrade network performance by delaying finality.",
+    "avgValidatorEffectiveness": "A measure of the average performance of a validator across key consensus duties, such as proposing blocks and attesting correctly. A higher rating indicates that the validator consistently participates in securing the network and follows the protocol rules effectively. This metric helps assess the reliability and efficiency of a validator, with poor effectiveness typically resulting in lower rewards and a negative impact on the network’s overall health.",
+    "avgInclusionDelay": "The average of the distance between the slot a validator’s attestation is expected by the network and the slot the attestation is actually included on-chain. Lower inclusion delay indicates that a validator’s attestations are being included quickly, maximizing rewards and contributing effectively to consensus. High inclusion delay can result from network latency, poor relay performance, or delayed broadcasting, leading to reduced rewards and slower finalization of the chain. This metric is crucial for evaluating a validator’s responsiveness and network efficiency.",
+    "sumWrongTargetVotes": "A wrong target vote occurs when a validator attests to an incorrect target checkpoint for a given epoch. Each epoch has a target checkpoint, and validators are expected to vote for the correct target to ensure the network's security and efficiency. Incorrect target votes can result from network delays, synchronization issues, or misconfigurations, leading to penalties for the validator and potentially affecting the network's finality.",
+    #"sumMissedAttestations": "Missed attestations refer to situations where an Ethereum validator fails to submit an attestation for a block they are supposed to attest to during a given epoch. Attestations are essential for reaching consensus and finalizing blocks, and missing them can result from network issues, poor validator performance, or misconfigurations. Missed attestations negatively affect a validator's rewards and can lead to penalties. High rates of missed attestations reduce the validator's reliability and can slow down the finalization process, impacting the overall network health.",
+    "sumLateSourceVotes": "A late source vote occurs when a validator attests to a source checkpoint after the optimal time window, which is within 1 to 5 slots after the checkpoint's creation. Validators are expected to submit their source votes promptly to maintain network efficiency and security. Late source votes can result from network delays, synchronization issues, or misconfigurations. While there is no direct penalty for a late source vote, it can lead to missed target votes, which are penalized.",
+    "avgCorrectness": "A measure of how many times a validator or entity has attested correctly in their target and head vote duties. The average between Target and Header accuracy. A higher rating indicates that the validator consistently follows protocol guidelines, contributing to network security and efficiency. This metric is essential for assessing a validator's reliability and performance within the Ethereum ecosystem.",
+    "avgAttesterEffectiveness": "A measure of how effectively an Ethereum validator performs its attestation duties, which are crucial for network consensus. Validators are expected to submit accurate and timely attestations, including source, target, and head votes, to support the chain's finality and security. High attester effectiveness indicates that a validator consistently follows protocol rules, contributing to network stability and earning rewards. Conversely, low effectiveness can result from missed or incorrect attestations, leading to penalties and reduced rewards."
+} 
+
+def create_output_file(id, variable, date="", type_report="histogram", module="CSM", file_name=None, ext="png"):
 
     if isinstance(date, list) and len(date) > 1:
         date = f"{date[0]}_{date[len(date)-1]}"
 
     # Define the output file path using os.path.join
     if file_name is None:
-       file_name = f"{variable}_{date}.png" 
-    output_file = os.path.join("reports", module, str(id), type_plot, file_name)
+       file_name = f"{variable}_{date}.{ext}" 
+    output_file = os.path.join("reports", module, str(id), type_report, file_name)
     # Create the directory if it doesn't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     return output_file
