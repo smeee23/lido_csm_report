@@ -22,7 +22,7 @@ class ReportHandler:
                 for id, metrics in operators.items():
                     if any([f" {op_id} -" in id for op_id in self.operator_ids]):
                         for key, value in metrics.items():
-                            if date == "2024-12-25_2024-12-27" and key in DESCRIPTIONS.keys():
+                            if date == '2025-01-12_2025-01-16' and key in DESCRIPTIONS.keys():
                                 
                                 pdf_path = create_output_file(
                                                 id=format_op_ids(self.operator_ids), 
@@ -32,15 +32,24 @@ class ReportHandler:
                                                 module=self.module, 
                                                 ext="pdf"
                                             )
-                                description = DESCRIPTIONS[key]
-                                histo_path = create_output_file(
-                                                id=format_op_ids(self.operator_ids), 
-                                                variable=key, 
-                                                date=date, 
-                                                type_report="histogram", 
-                                                module=self.module, 
-                                                file_name=None
-                                            )
+                                description = DESCRIPTIONS[key]['desc']
+
+                                buffers = []
+                                for dist_type in ["csm", "sdvt", "cur", "all"]:
+                                    histo_path = create_output_file(
+                                                    id=format_op_ids(self.operator_ids), 
+                                                    variable=key, 
+                                                    date=date, 
+                                                    type_report="histogram", 
+                                                    module=self.module, 
+                                                    file_name=None,
+                                                    dist_type=dist_type
+                                                )
+                                    try:
+                                        with open(histo_path, 'rb') as f:
+                                            buffers.append(io.BytesIO(f.read()))
+                                    except:
+                                        buffers.append(None)
                                 
                                 time_series_path = create_output_file(
                                                 id=format_op_ids(self.operator_ids), 
@@ -51,16 +60,10 @@ class ReportHandler:
                                                 file_name=None
                                             )
                                 try:
-                                    with open(histo_path, 'rb') as f:
-                                        histo_buffer = io.BytesIO(f.read())
-                                except:
-                                    histo_buffer = None
-
-                                try:
                                     with open(time_series_path, 'rb') as f:
-                                        ts_buffer = io.BytesIO(f.read())
+                                        buffers.append(io.BytesIO(f.read()))
                                 except:
-                                    ts_buffer = None
+                                    buffers.append(None)
 
                                 if key in ATTEST_METRICS: stat_type = "per_val"
                                 else: stat_type = "metric"
@@ -77,7 +80,7 @@ class ReportHandler:
                                     node_operator=id, 
                                     metric_name=key, 
                                     description=description, 
-                                    figure_buffers=[histo_buffer, ts_buffer], 
+                                    figure_buffers=buffers, 
                                     metric_data=metric_data,
                                     date=date
                                 )

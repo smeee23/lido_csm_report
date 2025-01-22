@@ -4,24 +4,36 @@ from logger_config import logger
 from GaitKeeper import GaitKeeper
 import traceback
 import time
+from utils import LIDO_CURATED, LIDO_SDVT
 
 class RatedHandler:
     def __init__(self, sk):
         self.sk = sk
         self.node_operator_ids = [37, 135]
         self.rated_ids = []#["Lido", "Lido Community Staking Module"]
-        for n in range(165, 235):
-            self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")   
+        #for n in range(0, 400):
+        #    self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")
+        for id in LIDO_CURATED:
+            self.rated_ids.append(f"{id} - Lido")  
+        for id in LIDO_SDVT:
+            self.rated_ids.append(f"{id} - Lido SimpleDVT Module")  
 
     def write_api_data(self, s3):
         for id in self.rated_ids:
             if id == "Lido": entity_type = "pool"
             else: entity_type = "poolShare"
+
+            existing_data = s3.get_data(f"lido_csm/operator_data/{id}")
+
             urls = {
                 "attest": f"https://api.rated.network/v1/eth/entities/{id}/attestations",
                 "effective": f"https://api.rated.network/v1/eth/entities/{id}/effectiveness",
+                #"rewards": f"https://api.rated.network/v1/eth/entities/{id}/rewards",
+                #"penalties": f"https://api.rated.network/v1/eth/entities/{id}/penalties",
             }
-            yest, today = self.get_last_days(days=5)
+
+            #yest, today = self.get_last_days(days=4)
+            yest, today = "2025-01-12", "2025-01-16"
             params = {
                 "fromDate": yest,
                 "entityType": entity_type,
@@ -49,6 +61,7 @@ class RatedHandler:
                         results.append(data)
                     else:
                         logger.error(f"Request failed with status code {response.status_code}: {response.text}")
+                        print(f"Request failed with status code {response.status_code}: {response.text}")
 
                 except Exception as e:
                     traceback.print_exc()
@@ -56,7 +69,15 @@ class RatedHandler:
                     time.sleep(1)
 
             combined_data = self.combine_jsons(results)
-            s3.write_data(f"lido_csm/operator_data/{id}", combined_data) 
+            print(combined_data)
+            existing_data = s3.get_data(f"lido_csm/operator_data/{id}")
+            if existing_data:
+                for date, stats in list(existing_data.items()):
+                    if date not in combined_data:
+                        combined_data[date] = {}
+                    combined_data[date].update(stats)
+       
+            s3.write_data(f"lido_csm/operator_data/{id}", combined_data)
 
     def get_last_days(self, days=1):
         now = datetime.now(timezone.utc)

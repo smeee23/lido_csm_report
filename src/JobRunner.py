@@ -12,6 +12,7 @@ import json
 import os
 import time
 from logger_config import logger
+from utils import find_date_groups
 
 class JobRunner:
     def __init__(self, operator_ids, rated_api_call):
@@ -21,31 +22,40 @@ class JobRunner:
         sk = decrypt_string(os.getenv("AWS_S3_SECRET_KEY"), os.getenv("KEY"))
         self.s3ReadWriter = S3ReadWrite(sk, os.getenv("AWS_S3_ACCESS_KEY"))
         self.DataHandler =  DataHandler()
-        self.VisualHandler = VisualHandler(self.operator_ids)
+        self.VisualHandler = VisualHandler(self.operator_ids, self.DataHandler)
         self.ReportHandler = ReportHandler(self.operator_ids, self.DataHandler)
 
     def run(self):
         try:
             if self.rated_api_call:
                 logger.info("checking Rated.network stats [--rated-api-call set to True]")
-                rated_handler = RatedHandler(os.getenv("RATED_API_SK"))
+                rated_handler = RatedHandler(os.getenv("RATED_API_SK_4"))
                 rated_handler.write_api_data(s3=self.s3ReadWriter)
 
-            self.DataHandler.load_data(s3=self.s3ReadWriter)
+            if self.operator_ids:
+                self.DataHandler.load_data(s3=self.s3ReadWriter)
 
-            nos = self.DataHandler.node_data
-            agg_data = self.DataHandler.agg_data
-            self.DataHandler.get_mva(['2024-12-27', '2024-12-26', '2024-12-25'])
+                #self.DataHandler.create_df()
+                
+                #for date, operators in self.DataHandler.curated_module_data.items():
+                #    for id, stats in operators.items():
+                #        print(id)
+                #        for metric, values in stats.items():
+                #            print(metric, values)
+                nos = self.DataHandler.node_data
+                agg_data = self.DataHandler.agg_data
+  
+                self.DataHandler.get_mva(['2025-01-16', '2025-01-15', '2025-01-14', '2025-01-13', '2025-01-12'], module="csm")
+                self.DataHandler.get_mva(['2025-01-16', '2025-01-15', '2025-01-14', '2025-01-13', '2025-01-12'], module="sdvt")
+                self.DataHandler.get_mva(['2025-01-16', '2025-01-15', '2025-01-14', '2025-01-13', '2025-01-12'], module="curated")
+                
+                self.DataHandler.get_statistics(module="csm")
+                self.DataHandler.get_zscores(module="csm")
 
-            self.DataHandler.get_statistics()
-            stats = self.DataHandler.node_stats
+                self.VisualHandler.generate_histograms(node_data=nos, date="2025-01-12_2025-01-16", sdvt_data=self.DataHandler.sdvt_data, curated_module_data=self.DataHandler.curated_module_data)
+                self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
 
-            self.DataHandler.get_zscores()
-
-            self.VisualHandler.generate_histograms(data=nos, date="2024-12-25_2024-12-27")
-            self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
-
-            self.ReportHandler.generate_report()
+                self.ReportHandler.generate_report()
 
             last_write = int(time.time())
             self.s3ReadWriter.write_data("lido_csm/last_write", last_write)

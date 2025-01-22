@@ -3,13 +3,16 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Image, Spacer
 from reportlab.lib.units import inch
+from datetime import datetime
 import io
 import matplotlib.pyplot as plt
 import seaborn as sns
 import re
 import os
 from logger_config import logger
-from utils import create_output_file, format_op_ids, ATTEST_METRICS
+from utils import create_output_file, format_op_ids, ATTEST_METRICS, format_label, generate_spaces, get_average_ratings_for_dates, format_title
+import numpy as np
+import pandas
 
 node_colors = ["red", "yellow", "orange", "purple", "green"]
 
@@ -36,17 +39,13 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
     desc_para = Paragraph(description, description_style)
 
     # Convert buffer to ReportLab Image
-    if figure_buffers[0]:
-        figure_buffer = figure_buffers[0]
-        figure_buffer.seek(0)
-        image1 = Image(figure_buffer, width=4.725*inch, height=2.835*inch)
-    else: image1 = None
-    
-    if figure_buffers[1]:
-        figure_buffer = figure_buffers[1]
-        figure_buffer.seek(0)
-        image2 = Image(figure_buffer, width=4.725*inch, height=2.835*inch)
-    else: image2 = None
+    images = []
+    for buffer in figure_buffers:
+        if buffer:
+            figure_buffer = buffer
+            figure_buffer.seek(0)
+            images.append(Image(figure_buffer, width=4.725*inch, height=2.835*inch))
+        else: images.append(None)
 
     if metric_name in ATTEST_METRICS:
         tag = "per val"
@@ -97,12 +96,13 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
     # Build the PDF content
     content = [
         Paragraph(f"{node_operator[4:]} - {format_label(metric_name)} Analysis for {date.replace("_", " - ")}", title_style),
-        image1,
+        table,
         Spacer(1, 20),
-        image2,
-        Spacer(1, 20),
-        table
     ]
+    for image in images:
+        if image:
+            content.append(image)
+            content.append(Spacer(1, 20))
     
     doc.build(content)
 
@@ -125,53 +125,108 @@ def generate_metric_report(node_operator, metric_data_dict):
             data['metrics']
         )
 
-def plot_histogram(data, variable, operator_ids, variant="per_val", date=None):
+def generate_plotting_data(node_data, variable, operator_ids, variant="per_val", date=None, sdvt_data={}, curated_module_data={}):
     highlighted_ratings = []
-    other_ratings = []
-
+    highlighted_zscores = []
+    other_csm_ratings = []
+    other_csm_zscores = []
+    curated_module_ratings = []
+    sdvt_ratings = []
     # If a list of dates is provided, compute the average over those dates
     if isinstance(date, list) or date is None:
         # Get the average ratings for the given operator_ids and dates
-        highlighted_ratings, other_ratings, date = get_average_ratings_for_dates(data, variable, operator_ids, date)
+        highlighted_ratings, other_csm_ratings, date = get_average_ratings_for_dates(node_data, variable, operator_ids, date)
     elif date:
-        if date in data:
-            for operator, metrics in data[date].items():
-                if variable in metrics and metrics[variable][variant] is not None:
-                    if any(f"Operator {id} -" in operator for id in operator_ids):
-                        highlighted_ratings.append(metrics[variable][variant])
-                    else:
-                        other_ratings.append(metrics[variable][variant])
-    
+        for data in [node_data, sdvt_data, curated_module_data]:
+            if date in data:
+                for operator, metrics in data[date].items():
+                    if variable in metrics and metrics[variable][variant] is not None:
+                        if any(f"Operator {id} -" in operator for id in operator_ids):
+                            highlighted_ratings.append(metrics[variable][variant])
+                            if f"zscore_{variant}" in metrics[variable]:
+                                highlighted_zscores.append(metrics[variable][f"zscore_{variant}"])
+                        if "CSM Operator" in operator:
+                            other_csm_ratings.append(metrics[variable][variant])
+                            if f"zscore_{variant}" in metrics[variable]:
+                                other_csm_zscores.append(metrics[variable][f"zscore_{variant}"])
+                        elif "- Lido SimpleDVT Module" in operator:
+                            sdvt_ratings.append(metrics[variable][variant])
+                        elif "- Lido" in operator:
+                            curated_module_ratings.append(metrics[variable][variant])
 
     if len(highlighted_ratings) != len(operator_ids):
         logger.error(f"Plot not drawn b/c {variable} not found for all operator_ids {operator_ids}")
         return
     
-    # Create the histogram
-    plt.figure(figsize=(10, 6))
+    return {
+        "highlighted_ratings": highlighted_ratings,
+        "highlighted_zscores": highlighted_zscores,
+        "other_csm_ratings": other_csm_ratings,
+        "other_csm_zscores": other_csm_zscores,
+        "curated_module_ratings": curated_module_ratings,
+        "sdvt_ratings": sdvt_ratings
+        }
 
-    # Plot histogram for other operators in blue
-    sns.histplot(other_ratings, color="blue", label="CSM Operators")
+def plot_histogram(node_data, variable, operator_ids, variant="per_val", date=None, sdvt_data={}, curated_module_data={}, dist_type='all'):
+    
+    plotting_data = generate_plotting_data(
+        node_data, 
+        variable, 
+        operator_ids, 
+        variant, 
+        date, 
+        sdvt_data, 
+        curated_module_data
+    )
+    if plotting_data:
+        highlighted_ratings = plotting_data["highlighted_ratings"]
+        highlighted_zscores = plotting_data["highlighted_zscores"]
+        other_csm_ratings = plotting_data["other_csm_ratings"]
+        other_csm_zscores = plotting_data["other_csm_zscores"]
+        curated_module_ratings = plotting_data["curated_module_ratings"]
+        sdvt_ratings = plotting_data["sdvt_ratings"]
+        
+        # Create the histogram
+        plt.figure(figsize=(10, 6))
+        _, bins = np.histogram(curated_module_ratings + other_csm_ratings + sdvt_ratings, bins='auto')
 
-    # Plot highlighted operators in red
-    for i in range(0, len(operator_ids)):
-        color_index = i % len(node_colors)
-        id = operator_ids[i]
-        plt.scatter(highlighted_ratings[i], [1] , color=node_colors[color_index], label=f"CSM Operator {id}  |  {highlighted_ratings[i]:.6g}")
+        if dist_type == 'csm':
+            sns.histplot(other_csm_ratings, bins=bins, color="blue", label="CSM Operators")
+        elif dist_type == 'sdvt':
+            sns.histplot(sdvt_ratings, bins=bins, color="green", label="SDVT Operators")
+        elif dist_type == 'cur':
+            sns.histplot(curated_module_ratings, bins=bins, color="yellow", label="Curated Module")
+        else:
+            sns.histplot(curated_module_ratings + other_csm_ratings + sdvt_ratings, bins=bins, color="yellow", label="Curated Module")
+            sns.histplot(other_csm_ratings + sdvt_ratings, bins=bins, color="green", label="SDVT Operators")
+            sns.histplot(other_csm_ratings, bins=bins, color="blue", label="CSM Operators")
 
-    # Add labels and title
-    label = format_label(variable)
-    title = format_title(metric=variable, date=date, graph_type="Distribution")
-    plt.title(title)
-    plt.xlabel(label)
-    plt.ylabel("Operator Count")
-    plt.legend()
-    plt.tight_layout()
+        # Plot highlighted operators in red
+        for i in range(0, len(operator_ids)):
+            color_index = i % len(node_colors)
+            id = operator_ids[i]
+            plt.scatter(highlighted_ratings[i], [0] , color=node_colors[color_index], marker='D', label=f"CSM Operator {id}  |  {highlighted_ratings[i]:.6g}")
 
-    # Save or show plot
-    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="histogram", module="CSM")
-    plt.savefig(output_file, dpi=300, bbox_inches="tight")
-    logger.info(f"Plot saved to {output_file}")
+        # Add labels and title
+        label = format_label(variable)
+        title = format_title(metric=variable, date=date, graph_type="Distribution")
+        plt.title(title, fontsize=18)  # Increase font size for the title
+        plt.xlabel(label, fontsize=14)  # Increase font size for the x-axis label
+        plt.ylabel("Operator Count", fontsize=14)  # Increase font size for the y-axis label
+
+        # Adjust the legend font size
+        plt.legend(fontsize=12)
+
+        # Increase tick label size
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+
+        plt.tight_layout()
+        # Save or show plot
+        output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="histogram", module="CSM", dist_type=dist_type)
+        plt.savefig(output_file, dpi=300, bbox_inches="tight")
+        plt.close()
+        logger.info(f"Plot saved to {output_file}")
 
 def plot_line(data, variable, operator_ids, variant="per_val", agg_data=None):
     if agg_data:
@@ -194,91 +249,206 @@ def plot_line(data, variable, operator_ids, variant="per_val", agg_data=None):
                     operator_names[operator]["dates"].append(date)
                     operator_names[operator]["values"].append(metrics[variable][variant])
     
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(10, 6))
     
     # Plot each operator's data
     for operator, values in operator_names.items():
+        # Convert dates to datetime objects for sorting
+        sorted_dates_values = sorted(
+            zip(values["dates"], values["values"]),
+            key=lambda x: datetime.strptime(x[0], "%Y-%m-%d")  # Adjust date format as needed
+        )
+        sorted_dates, sorted_values = zip(*sorted_dates_values)
+
         name = operator.replace("- Lido Community Staking Module", "")
         if name == "Lido Community Staking Module": name = "CSM Operators"
         elif name == "Lido": name = "Lido (All)"
-        plt.plot(values["dates"], values["values"], marker='o', label=name)
+        plt.plot(sorted_dates, sorted_values, label=name)
     
     title = format_title(metric=variable, date=None, graph_type="Time Series")
     label = generate_spaces(variable)
 
-    plt.title(title)
-    plt.xlabel("Date")
-    plt.ylabel(label)
-    plt.legend(title="Operators")
+    plt.title(title, fontsize=18)  
+    plt.xlabel("Date", fontsize=14)  
+    plt.ylabel(label, fontsize=14)  
+
+    # Adjust the legend font size
+    plt.legend(fontsize=12)
+
+    # Increase tick label size
+    plt.xticks(rotation=45, ha="right", fontsize=12)
+    plt.yticks(fontsize=12)
+
     plt.grid(True)
     plt.tight_layout()
     
     output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="time_series", module="CSM")
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.close()
     logger.info(f"Plot saved to {output_file}")
 
-def get_average_ratings_for_dates(data, variable, operator_ids, variant="per_val", date=None):
-    highlighted_ratings = []
-    other_ratings = []
-    operator_counts = {}
-    operator_sums = {}
+# 1. Gauge Plot with Performance Zones
+def gauge_plot(node_data, variable, operator_ids, variant="attest_pct", date=None, sdvt_data={}, curated_module_data={}):
 
-    # If date is None, use all available dates in the data
-    # exclude compound dates e.g. 2024-12-25_2024-12-27
-    valid_dates = [d for d in list(data.keys()) if "_" not in d]
-    if date is None: dates = valid_dates
-    else: dates = date
+    plotting_data = generate_plotting_data(
+        node_data, 
+        variable, 
+        operator_ids, 
+        variant, 
+        date, 
+        sdvt_data, 
+        curated_module_data
+    )
 
-    for current_date in dates:
-        if current_date in data and "_" not in current_date:
-            for operator, metrics in data[current_date].items():
-                if variable in metrics and metrics[variable][variant] is not None:
-                    if operator not in operator_counts:
-                        operator_counts[operator] = 0
-                        operator_sums[operator] = 0
-
-                    operator_counts[operator] += 1
-                    operator_sums[operator] += metrics[variable][variant]
-
-    # Calculate averages
-    for operator in operator_counts:
-        avg = operator_sums[operator] / operator_counts[operator]
-        if any(f"Operator {id} -" in operator for id in operator_ids):
-            highlighted_ratings.append(avg)
-        else:
-            other_ratings.append(avg)
-    return highlighted_ratings, other_ratings, dates
-
-def format_title(metric, date, graph_type="Distribution"):
-    # Remove the first 6 characters if the string starts with "perVal"
-    if metric.startswith("perVal"):
-        metric = metric[6:]
+    if not plotting_data:
+        return None           
+            
+    fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={'projection': 'polar'})
     
-    # Add a space before each capital letter
-    formatted_string = generate_spaces(metric)
+    highlighted_ratings = plotting_data["highlighted_ratings"]
+    if len(highlighted_ratings) > 1:
+        return None
     
-    if date is None:
-        date = ""
-    elif isinstance(date, list) and len(date) > 1:
-        date = f"{len(date)}day MVA {date[len(date)-1]}"
-    elif "_" in date:
-        date = date.replace("_", " - ")
+    # Convert effectiveness to angle (0-100 -> 0-180 degrees)
+    angle = np.pi * (highlighted_ratings[0]/100)
     
+    # Create the gauge
+    ax.set_theta_direction(-1)
+    ax.set_theta_offset(np.pi/2)
+    ax.set_rlim(0, 1)
+    
+    # Add colored zones
+    zones = [(0, 80, 'red'), (80, 95, 'yellow'), (95, 100, 'green')]
+    for start, end, color in zones:
+        angle_start = np.pi * (start/100)
+        angle_end = np.pi * (end/100)
+        ax.fill_between(np.linspace(angle_start, angle_end, 50),
+                        0, 1, alpha=0.3, color=color)
+    
+    # Plot the value
+    ax.plot([0, angle], [0, 0.8], color='black', linewidth=2)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    plt.title(f'Operator {operator_ids[0]} Effectiveness Gauge\n{highlighted_ratings[0]}%')
+    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="gauge", module="CSM")
+    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.close()
+    logger.info(f"Plot saved to {output_file}")
 
-    return f"{formatted_string.replace("avg", "Average")} {graph_type} {date}" 
+# 2. Box and Violin Plot Comparison
+def comparison_plot(node_data, avg, median, variable, operator_ids, variant="per_val", date=None, sdvt_data={}, curated_module_data={}):
+    plotting_data = generate_plotting_data(
+        node_data, 
+        variable, 
+        operator_ids, 
+        variant, 
+        date, 
+        sdvt_data, 
+        curated_module_data
+    )
 
-def format_label(metric):
-    # Remove the first 6 characters if the string starts with "perVal"
-    if metric.startswith("perVal"):
-        metric = metric[6:]
+    if not plotting_data:
+        return None
     
-    metric = metric
-    # Add a space before each capital letter
-    formatted_string = generate_spaces(metric)
-    
-    if "Average" in formatted_string:
-        return formatted_string
-    return f"{formatted_string} Per Validator" 
+    highlighted_ratings = plotting_data["highlighted_ratings"]
+    other_csm_ratings = plotting_data["other_csm_ratings"]
 
-def generate_spaces(s):
-    return re.sub(r'(?<!^)(?=[A-Z])', ' ', s).replace("avg", "Average").replace("sum", "")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    
+    # Create violin plot
+    sns.violinplot(data=other_csm_ratings, color='lightgray', inner='box')
+
+    for rating in other_csm_ratings:
+        if rating < 0:
+            print(rating)
+
+    for i, rating in enumerate(highlighted_ratings):
+        color = f'C{i}' 
+        plt.scatter(0, highlighted_ratings[0], color='red', 
+                s=100, zorder=3, label=f'Operator {operator_ids[0]}')
+    
+    # Add mean and median lines
+    plt.axhline(y=avg, color='blue', 
+                linestyle='--', label='CSM Average')
+    plt.axhline(y=median, color='green', 
+                linestyle='--', label='CSM Median')
+    
+    plt.title('Effectiveness Distribution Comparison')
+    plt.ylabel('Effectiveness Score')
+    plt.legend()
+    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="voilin_box", module="CSM", dist_type="voilin_box")
+    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.close()
+    logger.info(f"Plot saved to {output_file}")
+
+# Z-Score Visualization
+def plot_zscores(node_data, variable, operator_ids, variant="per_val", date=None, sdvt_data={}, curated_module_data={}):
+    plotting_data = generate_plotting_data(
+        node_data, 
+        variable, 
+        operator_ids, 
+        variant, 
+        date, 
+        sdvt_data, 
+        curated_module_data
+    )
+
+    if not plotting_data:
+        return None
+
+    highlighted_zscores = plotting_data["highlighted_zscores"]
+    other_csm_zscores = plotting_data["other_csm_zscores"]
+    
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(10, 4))
+    
+    # Generate points for the normal distribution curve
+    z_range = np.linspace(-3, 3, 100)
+    normal_dist = np.exp(-(z_range**2)/2) / np.sqrt(2*np.pi)
+    
+    # Plot the normal distribution curve
+    plt.plot(z_range, normal_dist, 'b-', alpha=0.5, label='Normal Distribution')
+    
+    # Add shaded regions for different z-score ranges
+    plt.fill_between(z_range, normal_dist, where=(z_range >= -1) & (z_range <= 1), 
+                    color='green', alpha=0.2)
+    plt.fill_between(z_range, normal_dist, where=(z_range >= -2) & (z_range <= 2), 
+                    color='yellow', alpha=0.1)
+    plt.fill_between(z_range, normal_dist, where=(z_range >= -3) & (z_range <= 3), 
+                    color='red', alpha=0.05)
+    
+    # Plot vertical lines for each highlighted z-score
+    for i, z_score in enumerate(highlighted_zscores):
+        color = f'C{i}'  # Use different colors for each operator
+        plt.axvline(x=z_score, color=color, linestyle='--', 
+                   label=f'Operator {operator_ids[i]} (z={z_score:.3f})')
+    
+    # Add reference lines at standard deviations
+    for sd in [-2, -1, 0, 1, 2]:
+        plt.axvline(x=sd, color='gray', linestyle=':', alpha=0.3)
+        
+    # Customize the plot
+    plt.title('Z-Score Distribution', fontsize=14)
+    plt.xlabel('Standard Deviations from Mean', fontsize=12)
+    plt.ylabel('Density', fontsize=12)
+    
+    # Adjust legend
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
+    
+    # Add grid for better readability
+    plt.grid(True, alpha=0.3)
+    
+    # Set x-axis limits and ticks
+    plt.xlim(-3, 3)
+    plt.xticks(np.arange(-3, 4, 1))
+    
+    # Adjust layout to prevent legend cutoff
+    plt.tight_layout()
+    
+    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="zscore_dist", module="CSM", dist_type="zscore")
+    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.close()
+    logger.info(f"Plot saved to {output_file}")
+
+    
