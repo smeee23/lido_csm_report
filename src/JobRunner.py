@@ -52,6 +52,21 @@ class JobRunner:
                 self.DataHandler.get_statistics(module="csm")
                 self.DataHandler.get_zscores(module="csm")
 
+                self.DataHandler.get_statistics(module="sdvt")
+                self.DataHandler.get_zscores(module="sdvt")
+
+                self.DataHandler.get_statistics(module="curated")
+                self.DataHandler.get_zscores(module="curated")
+
+                for date, operators in self.DataHandler.node_data.items():
+                    for id, stats in operators.items():
+                        if "107" in id:
+                            print(date)
+                            print(id)
+                            for metric, values in stats.items():
+                                if metric == "sumWrongHeadVotes":
+                                    print(metric, values)
+
                 self.VisualHandler.generate_histograms(node_data=nos, date="2025-01-12_2025-01-16", sdvt_data=self.DataHandler.sdvt_data, curated_module_data=self.DataHandler.curated_module_data)
                 self.VisualHandler.generate_time_series(data=nos, agg_data=agg_data)
 

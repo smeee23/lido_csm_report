@@ -1,7 +1,7 @@
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Image, Spacer
+from reportlab.platypus import BaseDocTemplate, PageBreak, Frame, PageTemplate, Paragraph, Table, TableStyle, Image, Spacer, HRFlowable
 from reportlab.lib.units import inch
 from datetime import datetime
 import io
@@ -14,10 +14,52 @@ from utils import create_output_file, format_op_ids, ATTEST_METRICS, format_labe
 import numpy as np
 import pandas
 
+
 node_colors = ["red", "yellow", "orange", "purple", "green"]
 
 def create_metric_page(pdf_path, node_operator, metric_name, description, figure_buffers, metric_data, date):
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=32, bottomMargin=32)
+    # Define the page size and margins
+    PAGE_WIDTH, PAGE_HEIGHT = letter
+    MARGIN = 72
+
+    # Create the document
+    doc = BaseDocTemplate(
+        pdf_path,
+        pagesize=letter,
+        rightMargin=MARGIN,
+        leftMargin=MARGIN,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch
+    )
+
+    # Define frames for the top and bottom halves of the page
+    top_frame = Frame(
+        MARGIN,
+        PAGE_HEIGHT / 2,  # Start halfway down
+        PAGE_WIDTH - 2 * MARGIN,
+        PAGE_HEIGHT / 2 - MARGIN,  # Height of top half
+        id="top",
+    )
+    bottom_frame = Frame(
+        MARGIN,
+        MARGIN,
+        PAGE_WIDTH - 2 * MARGIN,
+        PAGE_HEIGHT / 2 - MARGIN,  # Height of bottom half
+        id="bottom",
+    )
+
+    def on_page(canvas, doc):
+        # Footer
+        footer_text = metric_name
+        page_number_text = f"Page {doc.page}"
+        canvas.setFont("Helvetica", 10)
+        canvas.drawString(MARGIN, 0.5 * inch, footer_text)
+        canvas.drawRightString(PAGE_WIDTH - MARGIN, 0.5 * inch, page_number_text)
+
+    page_template = PageTemplate(id="TwoFrame", frames=[top_frame, bottom_frame], onPage=on_page)
+    doc.addPageTemplates([page_template])
+
+    # Styles
     styles = getSampleStyleSheet()
     
     # Create custom styles
@@ -25,7 +67,8 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
         'CustomTitle',
         parent=styles['Heading1'],
         fontSize=14,
-        spaceAfter=10
+        spaceAfter=10,
+        alignment=1,
     )
     
     description_style = ParagraphStyle(
@@ -35,6 +78,14 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
         leading=14,
         spaceAfter=10
     )
+
+    figure_style = ParagraphStyle(
+        'CustomFigure',
+        parent=styles['Italic'],
+        fontSize=5,
+        alignment=1,
+    )
+
     # Create description paragraph
     desc_para = Paragraph(description, description_style)
 
@@ -44,7 +95,7 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
         if buffer:
             figure_buffer = buffer
             figure_buffer.seek(0)
-            images.append(Image(figure_buffer, width=4.725*inch, height=2.835*inch))
+            images.append(Image(figure_buffer, width=5.5*inch, height=3.3*inch, hAlign='CENTER'))
         else: images.append(None)
 
     if metric_name in ATTEST_METRICS:
@@ -52,17 +103,22 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
     # Create table data
     table_data = [
         ['Metric', 'Value', 'Z-Score', 'Description'],
+        ['# Validators', metric_data['validatorCount'], '-', ''],
         ['CSM Operators Avg', metric_data['mean'], '-',''],
         ['CSM Operators Median', metric_data['median'], '-', ''],
-        ['Standard Deviation', metric_data['std_dev'], '-', ''],
-        ['# Validators', metric_data['validatorCount'], '-', ''],
+        ['CSM Standard Deviation', metric_data['std_dev'], '-', ''],
+        ['Curated Avg', metric_data['mean_curated'], '-',''],
+        ['Curated Median', metric_data['median_curated'], '-', ''],
+        ['SDVT Avg', metric_data['mean_sdvt'], '-',''],
+        ['SDVT Median', metric_data['median_sdvt'], '-', ''],
     ]
 
     if metric_name in ATTEST_METRICS:
+        table_data.insert(1, ['Total Attestations', metric_data['totalUniqueAttestations'], '-', ''])
+        table_data.insert(1, [f'Total {format_label(metric_name).replace("Per Validator", "")}', metric_data['sum'], '-', ''])
+        table_data.insert(1, ['% Total Attestations', f"{metric_data['attest_pct']}%", metric_data['zscore_attest_pct'], ''])
         table_data.insert(1, [f"{format_label(metric_name).replace("Per Validator", "")} / Val / Day", metric_data['per_val'], metric_data['zscore_per_val'], desc_para])
-        table_data.insert(2, ['% Total Attestations', f"{metric_data['attest_pct']}%", metric_data['zscore_attest_pct'], ''])
-        table_data.insert(-1, [f'Total {format_label(metric_name).replace("Per Validator", "")}', metric_data['sum'], '-', ''])
-        table_data.insert(-1, ['Total Attestations', metric_data['totalUniqueAttestations'], '-', ''])
+        
     else:
         table_data.insert(1, [format_label(metric_name).replace("Average", ""), metric_data['metric'], metric_data['zscore_metric'], desc_para])
 
@@ -93,18 +149,50 @@ def create_metric_page(pdf_path, node_operator, metric_name, description, figure
         ('VALIGN', (3, 1), (3, -1), 'TOP'),
     ]))
     
-    # Build the PDF content
-    content = [
-        Paragraph(f"{node_operator[4:]} - {format_label(metric_name)} Analysis for {date.replace("_", " - ")}", title_style),
-        table,
-        Spacer(1, 20),
-    ]
-    for image in images:
-        if image:
-            content.append(image)
-            content.append(Spacer(1, 20))
+    # Create content for the PDF
+    content = []
+
+    # Title and description
+    content.append(Paragraph(f"{node_operator[4:]} - {format_label(metric_name)} Analysis for {date.replace('_', ' - ')}", title_style))
+
+    content.append(table)
+
+    # Spacer and line break
+    content.append(Spacer(1, 30))
+
+    content.append(images.pop())
+    content.append(Paragraph("Figure 1: Metric Trends", figure_style))
+    content.append(PageBreak())
+
+    # Remaining images: 2 per page, separated by page breaks
+    for i, img in enumerate(images):
+        content.append(img)
+        content.append(Paragraph(f"Figure {i + 2}: Additional Trends", figure_style))
+        
+        # Add a page break after every two images
+        if (i + 1) % 2 == 0:
+            content.append(PageBreak())
+        else:
+            content.append(Spacer(1, 50))
+            content.append(HRFlowable(width="100%", thickness=2, color=colors.black))
+            content.append(Spacer(1, 30))
     
     doc.build(content)
+
+def footer(canvas, doc):
+    """
+    Draw a footer on each page.
+    """
+    PAGE_WIDTH, PAGE_HEIGHT = letter
+    footer_text = "State of Nodes"
+    page_number_text = f"Page {doc.page}"
+
+    # Draw footer text
+    canvas.setFont("Helvetica", 10)
+    canvas.drawString(inch, 0.5 * inch, footer_text)
+
+    # Draw page number on the right
+    canvas.drawRightString(PAGE_WIDTH - inch, 0.5 * inch, page_number_text)
 
 def generate_metric_report(node_operator, metric_data_dict):
     """
@@ -205,11 +293,11 @@ def plot_histogram(node_data, variable, operator_ids, variant="per_val", date=No
         for i in range(0, len(operator_ids)):
             color_index = i % len(node_colors)
             id = operator_ids[i]
-            plt.scatter(highlighted_ratings[i], [0] , color=node_colors[color_index], marker='D', label=f"CSM Operator {id}  |  {highlighted_ratings[i]:.6g}")
+            plt.scatter(highlighted_ratings[i], [0] , color=node_colors[color_index], label=f"CSM Operator {id}  |  {highlighted_ratings[i]:.6g}")
 
         # Add labels and title
         label = format_label(variable)
-        title = format_title(metric=variable, date=date, graph_type="Distribution")
+        title = format_title(metric=variable, date=None, graph_type="Distribution")
         plt.title(title, fontsize=18)  # Increase font size for the title
         plt.xlabel(label, fontsize=14)  # Increase font size for the x-axis label
         plt.ylabel("Operator Count", fontsize=14)  # Increase font size for the y-axis label
@@ -287,55 +375,7 @@ def plot_line(data, variable, operator_ids, variant="per_val", agg_data=None):
     plt.close()
     logger.info(f"Plot saved to {output_file}")
 
-# 1. Gauge Plot with Performance Zones
-def gauge_plot(node_data, variable, operator_ids, variant="attest_pct", date=None, sdvt_data={}, curated_module_data={}):
-
-    plotting_data = generate_plotting_data(
-        node_data, 
-        variable, 
-        operator_ids, 
-        variant, 
-        date, 
-        sdvt_data, 
-        curated_module_data
-    )
-
-    if not plotting_data:
-        return None           
-            
-    fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={'projection': 'polar'})
-    
-    highlighted_ratings = plotting_data["highlighted_ratings"]
-    if len(highlighted_ratings) > 1:
-        return None
-    
-    # Convert effectiveness to angle (0-100 -> 0-180 degrees)
-    angle = np.pi * (highlighted_ratings[0]/100)
-    
-    # Create the gauge
-    ax.set_theta_direction(-1)
-    ax.set_theta_offset(np.pi/2)
-    ax.set_rlim(0, 1)
-    
-    # Add colored zones
-    zones = [(0, 80, 'red'), (80, 95, 'yellow'), (95, 100, 'green')]
-    for start, end, color in zones:
-        angle_start = np.pi * (start/100)
-        angle_end = np.pi * (end/100)
-        ax.fill_between(np.linspace(angle_start, angle_end, 50),
-                        0, 1, alpha=0.3, color=color)
-    
-    # Plot the value
-    ax.plot([0, angle], [0, 0.8], color='black', linewidth=2)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    plt.title(f'Operator {operator_ids[0]} Effectiveness Gauge\n{highlighted_ratings[0]}%')
-    output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="gauge", module="CSM")
-    plt.savefig(output_file, dpi=300, bbox_inches="tight")
-    plt.close()
-    logger.info(f"Plot saved to {output_file}")
-
-# 2. Box and Violin Plot Comparison
+#Voilin-box
 def comparison_plot(node_data, avg, median, variable, operator_ids, variant="per_val", date=None, sdvt_data={}, curated_module_data={}):
     plotting_data = generate_plotting_data(
         node_data, 
@@ -359,14 +399,10 @@ def comparison_plot(node_data, avg, median, variable, operator_ids, variant="per
     # Create violin plot
     sns.violinplot(data=other_csm_ratings, color='lightgray', inner='box')
 
-    for rating in other_csm_ratings:
-        if rating < 0:
-            print(rating)
-
     for i, rating in enumerate(highlighted_ratings):
         color = f'C{i}' 
         plt.scatter(0, highlighted_ratings[0], color='red', 
-                s=100, zorder=3, label=f'Operator {operator_ids[0]}')
+                s=100, zorder=3, label=f"CSM Operator {operator_ids[i]}  |  {highlighted_ratings[i]:.6g}")
     
     # Add mean and median lines
     plt.axhline(y=avg, color='blue', 
@@ -374,15 +410,19 @@ def comparison_plot(node_data, avg, median, variable, operator_ids, variant="per
     plt.axhline(y=median, color='green', 
                 linestyle='--', label='CSM Median')
     
-    plt.title('Effectiveness Distribution Comparison')
-    plt.ylabel('Effectiveness Score')
-    plt.legend()
+    label = format_label(variable)
+    title = format_title(metric=variable, date=None, graph_type="Voilin-Box")
+    plt.title(title, fontsize=18)
+    plt.ylabel(label, fontsize=14)
+    plt.legend(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
     output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="voilin_box", module="CSM", dist_type="voilin_box")
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     plt.close()
     logger.info(f"Plot saved to {output_file}")
 
-# Z-Score Visualization
 def plot_zscores(node_data, variable, operator_ids, variant="per_val", date=None, sdvt_data={}, curated_module_data={}):
     plotting_data = generate_plotting_data(
         node_data, 
@@ -393,15 +433,15 @@ def plot_zscores(node_data, variable, operator_ids, variant="per_val", date=None
         sdvt_data, 
         curated_module_data
     )
-
+    
     if not plotting_data:
         return None
-
+    
     highlighted_zscores = plotting_data["highlighted_zscores"]
     other_csm_zscores = plotting_data["other_csm_zscores"]
     
-    # Create the plot
-    fig, ax = plt.subplots(figsize=(10, 4))
+    # Create the plot with full space utilization
+    fig, ax = plt.subplots(figsize=(10, 6))
     
     # Generate points for the normal distribution curve
     z_range = np.linspace(-3, 3, 100)
@@ -411,31 +451,33 @@ def plot_zscores(node_data, variable, operator_ids, variant="per_val", date=None
     plt.plot(z_range, normal_dist, 'b-', alpha=0.5, label='Normal Distribution')
     
     # Add shaded regions for different z-score ranges
-    plt.fill_between(z_range, normal_dist, where=(z_range >= -1) & (z_range <= 1), 
-                    color='green', alpha=0.2)
-    plt.fill_between(z_range, normal_dist, where=(z_range >= -2) & (z_range <= 2), 
-                    color='yellow', alpha=0.1)
-    plt.fill_between(z_range, normal_dist, where=(z_range >= -3) & (z_range <= 3), 
-                    color='red', alpha=0.05)
+    plt.fill_between(z_range, normal_dist, where=(z_range >= -1) & (z_range <= 1),
+                     color='green', alpha=0.2)
+    plt.fill_between(z_range, normal_dist, where=(z_range >= -2) & (z_range <= 2),
+                     color='yellow', alpha=0.1)
+    plt.fill_between(z_range, normal_dist, where=(z_range >= -3) & (z_range <= 3),
+                     color='red', alpha=0.05)
     
     # Plot vertical lines for each highlighted z-score
     for i, z_score in enumerate(highlighted_zscores):
-        color = f'C{i}'  # Use different colors for each operator
-        plt.axvline(x=z_score, color=color, linestyle='--', 
-                   label=f'Operator {operator_ids[i]} (z={z_score:.3f})')
+        color = f'C{i}'
+        plt.axvline(x=z_score, color=color, linestyle='--',
+                    label=f'CSM Operator {operator_ids[i]} | z={z_score:.3f})')
     
     # Add reference lines at standard deviations
     for sd in [-2, -1, 0, 1, 2]:
         plt.axvline(x=sd, color='gray', linestyle=':', alpha=0.3)
-        
-    # Customize the plot
-    plt.title('Z-Score Distribution', fontsize=14)
-    plt.xlabel('Standard Deviations from Mean', fontsize=12)
-    plt.ylabel('Density', fontsize=12)
     
-    # Adjust legend
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
+    # Add labels and title
+    title = format_title(metric=variable, date=None, graph_type="Z-Score Distribution")
+    plt.title(title, fontsize=18)  # Increase font size for the title
+    plt.xlabel('Standard Deviations from Mean', fontsize=14)
+    plt.ylabel('Density', fontsize=14)
     
+    plt.legend(loc='upper left', fontsize=12)
+    # Increase tick label size
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
     # Add grid for better readability
     plt.grid(True, alpha=0.3)
     
@@ -443,7 +485,6 @@ def plot_zscores(node_data, variable, operator_ids, variant="per_val", date=None
     plt.xlim(-3, 3)
     plt.xticks(np.arange(-3, 4, 1))
     
-    # Adjust layout to prevent legend cutoff
     plt.tight_layout()
     
     output_file = create_output_file(format_op_ids(operator_ids), variable, date, type_report="zscore_dist", module="CSM", dist_type="zscore")

@@ -1,4 +1,4 @@
-from visualizations import plot_histogram, plot_line, plot_zscores, comparison_plot, gauge_plot
+from visualizations import plot_histogram, plot_line, plot_zscores, comparison_plot
 from utils import DESCRIPTIONS
 
 class VisualHandler:
@@ -12,7 +12,6 @@ class VisualHandler:
                 variant = meta_data['variant']
                 avg = self.dh.node_stats[date][variable][variant]["mean"]
                 median = self.dh.node_stats[date][variable][variant]["median"]
-                print(f"{variable} {avg} {median}")
 
                 comparison_plot(node_data=node_data, avg=avg, median=median, variable=variable, operator_ids=[id], variant=variant, date=date)  
                 plot_zscores(node_data=node_data, variable=variable, operator_ids=[id], variant=variant, date=date)        

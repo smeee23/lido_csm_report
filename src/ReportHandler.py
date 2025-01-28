@@ -35,8 +35,10 @@ class ReportHandler:
                                 description = DESCRIPTIONS[key]['desc']
 
                                 buffers = []
-                                for dist_type in ["csm", "sdvt", "cur", "all"]:
-                                    histo_path = create_output_file(
+                                paths = []
+                                
+                                for dist_type in ["csm", "all", "sdvt", "cur"]:
+                                    paths.append(create_output_file(
                                                     id=format_op_ids(self.operator_ids), 
                                                     variable=key, 
                                                     date=date, 
@@ -44,31 +46,53 @@ class ReportHandler:
                                                     module=self.module, 
                                                     file_name=None,
                                                     dist_type=dist_type
-                                                )
-                                    try:
-                                        with open(histo_path, 'rb') as f:
-                                            buffers.append(io.BytesIO(f.read()))
-                                    except:
-                                        buffers.append(None)
+                                                ))
                                 
-                                time_series_path = create_output_file(
+                                paths.append(create_output_file(
+                                                id=format_op_ids(self.operator_ids), 
+                                                variable=key, 
+                                                date=date, 
+                                                type_report="voilin_box", 
+                                                module=self.module, 
+                                                file_name=None,
+                                                dist_type="voilin_box"
+                                            ))
+                                
+                                paths.append(create_output_file(
+                                                id=format_op_ids(self.operator_ids), 
+                                                variable=key, 
+                                                date=date, 
+                                                type_report="zscore_dist", 
+                                                module=self.module, 
+                                                file_name=None,
+                                                dist_type="zscore"
+                                            ))
+                                
+                                paths.append(create_output_file(
                                                 id=format_op_ids(self.operator_ids), 
                                                 variable=key, 
                                                 date=date, 
                                                 type_report="time_series", 
                                                 module=self.module, 
                                                 file_name=None
-                                            )
-                                try:
-                                    with open(time_series_path, 'rb') as f:
-                                        buffers.append(io.BytesIO(f.read()))
-                                except:
-                                    buffers.append(None)
+                                            ))
+                                
+                                for path in paths:
+                                    try:
+                                        with open(path, 'rb') as f:
+                                            buffers.append(io.BytesIO(f.read()))
+                                    except:
+                                        buffers.append(None)
 
                                 if key in ATTEST_METRICS: stat_type = "per_val"
                                 else: stat_type = "metric"
 
-                                metric_data = {**(self.dh.node_stats[date][key][stat_type]) , **(self.dh.node_data[date][id][key])}                              
+                                metric_data = {
+                                    **(self.dh.node_stats[date][key][stat_type]), 
+                                    **(self.dh.node_data[date][id][key]),
+                                    **{f"{k}_sdvt": v for k, v in self.dh.sdvt_stats[date][key][stat_type].items()},
+                                    **{f"{k}_curated": v for k, v in self.dh.curated_stats[date][key][stat_type].items()}
+                                }                              
                                 metric_data['validatorCount'] = self.dh.node_data[date][id]['validatorCount']['metric']
                                 metric_data['totalUniqueAttestations'] = self.dh.node_data[date][id]['totalUniqueAttestations']['metric']
                                 if "sum" in self.dh.node_data[date][id][key]:

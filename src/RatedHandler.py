@@ -69,7 +69,6 @@ class RatedHandler:
                     time.sleep(1)
 
             combined_data = self.combine_jsons(results)
-            print(combined_data)
             existing_data = s3.get_data(f"lido_csm/operator_data/{id}")
             if existing_data:
                 for date, stats in list(existing_data.items()):

@@ -144,8 +144,9 @@ class DataHandler:
         elif module == "sdvt":
             data = self.sdvt_data
 
+        stats = {}
         for date, operators in data.items():
-            self.node_stats[date] = {}
+            stats[date] = {}
             
             # Extract metrics
             all_metrics = {metric: {} for metric in set(ATTEST_METRICS + OTHER_METRICS)}
@@ -163,7 +164,7 @@ class DataHandler:
             
             # Calculate statistics for each metric
             for metric, values in all_metrics.items():
-                self.node_stats[date][metric] = {}
+                stats[date][metric] = {}
                 for variable_name, metric_derivs in values.items():
                     valid_values = [v for v in metric_derivs if v is not None]
                     try:
@@ -176,7 +177,7 @@ class DataHandler:
                             median = mean = mode = std_dev = None
                         
                         # Store the statistics
-                        self.node_stats[date][metric][variable_name] = {
+                        stats[date][metric][variable_name] = {
                             'median': median,
                             'mean': mean,
                             'mode': mode,
@@ -184,44 +185,53 @@ class DataHandler:
                         }
                     except Exception as e:
                         # In case of any errors with statistics calculation (e.g., no valid values)
-                        self.node_stats[date][metric][variable_name]  = {
+                        stats[date][metric][variable_name]  = {
                             'median': None,
                             'mean': None,
                             'mode': None,
                             'std_dev': None,
                         }
+        if module == "csm":
+            self.node_stats = stats
+        elif module == "curated":
+            self.curated_stats = stats
+        elif module == "sdvt":
+            self.sdvt_stats = stats
 
     def get_zscores(self, module="csm"):
         data = {}
         if module == "csm":
             data = self.node_data
+            stats = self.node_stats
         elif module == "curated":
             data = self.curated_module_data
+            stats = self.curated_stats
         elif module == "sdvt":
             data = self.sdvt_data
+            stats = self.sdvt_stats
 
         for date, operators in list(data.items()):  
             
             for operator, metrics in list(operators.items()):  
                 for metric, value in list(metrics.items()): 
-                    if date in self.node_stats and value['metric'] is not None:
-                        if metric in self.node_stats[date]:
+                    if date in stats and value['metric'] is not None:
+                        if metric in stats[date]:
                             try:
                                 if "per_val" in value:
-                                    std_dev_per_val = self.node_stats[date][metric]["per_val"]["std_dev"]
-                                    mean_per_val = self.node_stats[date][metric]["per_val"]["mean"]
+                                    std_dev_per_val = stats[date][metric]["per_val"]["std_dev"]
+                                    mean_per_val = stats[date][metric]["per_val"]["mean"]
                                     zscore = self.calc_zscore(value["per_val"], mean_per_val, std_dev_per_val)
                                     label = "zscore_per_val"
                                     data[date][operator][metric][label] = zscore
                                     if "attest_pct" in value:
-                                        std_dev_pct = self.node_stats[date][metric]["attest_pct"]["std_dev"]
-                                        mean_pct = self.node_stats[date][metric]["attest_pct"]["mean"]
+                                        std_dev_pct = stats[date][metric]["attest_pct"]["std_dev"]
+                                        mean_pct = stats[date][metric]["attest_pct"]["mean"]
                                         zscore = self.calc_zscore(value["attest_pct"], mean_pct, std_dev_pct)
                                         label = "zscore_attest_pct"
                                         data[date][operator][metric][label] = zscore
                                 else:
-                                    std_dev = self.node_stats[date][metric]["metric"]["std_dev"]
-                                    mean = self.node_stats[date][metric]["metric"]["mean"]
+                                    std_dev = stats[date][metric]["metric"]["std_dev"]
+                                    mean = stats[date][metric]["metric"]["mean"]
                                     zscore = self.calc_zscore(value["metric"], mean, std_dev)
                                     label = "zscore_metric"
                                     data[date][operator][metric][label] = zscore
