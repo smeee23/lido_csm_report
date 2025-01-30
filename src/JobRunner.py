@@ -35,13 +35,6 @@ class JobRunner:
             if self.operator_ids:
                 self.DataHandler.load_data(s3=self.s3ReadWriter)
 
-                #self.DataHandler.create_df()
-                
-                #for date, operators in self.DataHandler.curated_module_data.items():
-                #    for id, stats in operators.items():
-                #        print(id)
-                #        for metric, values in stats.items():
-                #            print(metric, values)
                 nos = self.DataHandler.node_data
                 agg_data = self.DataHandler.agg_data
   

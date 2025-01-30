@@ -10,9 +10,9 @@ class RatedHandler:
     def __init__(self, sk):
         self.sk = sk
         self.node_operator_ids = [37, 135]
-        self.rated_ids = []#["Lido", "Lido Community Staking Module"]
-        #for n in range(0, 400):
-        #    self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")
+        self.rated_ids = ["Lido", "Lido Community Staking Module"]
+        for n in range(0, 400):
+            self.rated_ids.append(f"CSM Operator {n} - Lido Community Staking Module")
         for id in LIDO_CURATED:
             self.rated_ids.append(f"{id} - Lido")  
         for id in LIDO_SDVT:
@@ -28,8 +28,8 @@ class RatedHandler:
             urls = {
                 "attest": f"https://api.rated.network/v1/eth/entities/{id}/attestations",
                 "effective": f"https://api.rated.network/v1/eth/entities/{id}/effectiveness",
-                #"rewards": f"https://api.rated.network/v1/eth/entities/{id}/rewards",
-                #"penalties": f"https://api.rated.network/v1/eth/entities/{id}/penalties",
+                "rewards": f"https://api.rated.network/v1/eth/entities/{id}/rewards",
+                "penalties": f"https://api.rated.network/v1/eth/entities/{id}/penalties",
             }
 
             #yest, today = self.get_last_days(days=4)
